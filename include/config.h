@@ -11,6 +11,38 @@
   #endif
 #endif
 
+// definition des pin
+#define PIN_TFT_CS 5
+#define PIN_TFT_DC 19
+#define PIN_TFT_RST 4
+#define PIN_TFT_BL 15
+
+#define PIN_DHT 27
+
+#define PIN_LED_R 14
+#define PIN_LED_G 13
+#define PIN_LED_B 12
+
+#define PIN_BTN1 34
+#define PIN_BTN2 35
+
+#define PIN_BUZZER 25
+
+#define PIN_GPS_RX 16
+#define PIN_GPS_TX 17
+#define PIN_GPS_PPS 26
+
+#define I2C_SDA 21
+#define I2C_SCL 22
+
+#define LEDC_BL_CH 0
+#define LEDC_BL_FREQ 5000
+#define LEDC_BL_RES 8
+
+#define LEDC_BUZ_CH 1
+#define LEDC_BUZ_FREQ 2000
+#define LEDC_BUZ_RES 10
+
 // Localisation par défaut (Bordeaux)
 #define DEFAULT_LAT 44.8378
 #define DEFAULT_LON -0.5792
