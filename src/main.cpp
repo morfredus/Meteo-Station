@@ -70,7 +70,7 @@ static void drawStatusBar() {
   tft.setTextSize(1);
   tft.print(line);
 
-  drawWeatherIcon(tft, TFT_WIDTH-26, 0, gWeather.now.conditionCode);
+  drawWeatherIcon(tft, TFT_WIDTH-26, 0, weatherCodeToIcon(gWeather.now.conditionCode));
 }
 
 // Pages (comme avant, inchangées)
