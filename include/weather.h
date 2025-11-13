@@ -13,6 +13,10 @@ struct Forecast {
 struct CurrentWeather {
     float tempNow;
     int conditionCode;
+    float humidity;
+    float wind;
+    float tempMin;
+    float tempMax;
     bool hasAlert;
     String alertTitle;
     String alertDesc;
@@ -26,6 +30,9 @@ struct WeatherData {
 };
 
 String formatWeatherBrief(const WeatherData &data);
+
+// Convertit un code OpenWeather (int) en code d'icône (String)
+String weatherCodeToIcon(int code);
 
 // Fonction de récupération météo
 bool fetchWeatherOpenWeather(float lat, float lon, WeatherData &out);

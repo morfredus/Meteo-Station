@@ -3,6 +3,18 @@
 #include <WiFiClientSecure.h>
 #include <ArduinoJson.h>
 
+// Convertit un code OpenWeather (int) en code d'icône (String)
+String weatherCodeToIcon(int code) {
+    if (code == 800) return "clear";
+    if (code >= 801 && code <= 804) return "clouds";
+    if (code >= 200 && code <= 232) return "storm";
+    if (code >= 300 && code <= 321) return "rain";
+    if (code >= 500 && code <= 531) return "rain";
+    if (code >= 600 && code <= 622) return "snow";
+    if (code >= 701 && code <= 781) return "fog";
+    return "clouds"; // par défaut
+}
+
 bool fetchWeatherOpenWeather(float lat, float lon, WeatherData &out) {
     if (WiFi.status() != WL_CONNECTED) {
         Serial.println("WiFi non connecte, impossible de recuperer la meteo.");
@@ -52,6 +64,19 @@ bool fetchWeatherOpenWeather(float lat, float lon, WeatherData &out) {
     // Données actuelles
     out.now.tempNow = doc["current"]["temp"].as<float>();
     out.now.conditionCode = doc["current"]["weather"][0]["id"].as<int>();
+    out.now.humidity = doc["current"]["humidity"].as<float>();
+    out.now.wind = doc["current"]["wind_speed"].as<float>();
+
+    // tempMin et tempMax depuis les prévisions du jour actuel (daily[0])
+    if (!doc["daily"].isNull()) {
+        JsonArray daily = doc["daily"].as<JsonArray>();
+        if (!daily.isNull() && daily.size() > 0) {
+            JsonObject today = daily[0];
+            out.now.tempMin = today["temp"]["min"].as<float>();
+            out.now.tempMax = today["temp"]["max"].as<float>();
+        }
+    }
+
     out.now.hasAlert = false;
 
     // Gestion des alertes météo
