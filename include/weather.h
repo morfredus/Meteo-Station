@@ -1,34 +1,31 @@
-// weather.h
 #pragma once
 #include <Arduino.h>
+#include <vector>
 
-struct WeatherNow {
-  String conditionCode;   // "clear","clouds","rain","storm","fog","snow"
-  float tempNow;          // prévision instantanée (OpenWeather current)
-  float tempMin;
-  float tempMax;
-  float humidity;
-  float wind;
-  bool hasAlert;
-  String alertTitle;
-  String alertDesc;
-  String alertSeverity;   // "yellow","orange","red"
+// Structure pour une prévision journalière
+struct Forecast {
+    float tempDay;
+    float tempNight;
+    int conditionCode;
 };
 
-struct ForecastDay {
-  String date;
-  float tmin;
-  float tmax;
-  String code;
-  float pop; // prob of precip
-  float wind;
+// Structure pour la météo actuelle
+struct CurrentWeather {
+    float tempNow;
+    int conditionCode;
+    bool hasAlert;
+    String alertTitle;
+    String alertDesc;
+    String alertSeverity;
 };
 
+// Structure globale météo
 struct WeatherData {
-  WeatherNow now;
-  ForecastDay daily[4]; // today + 3 jours
+    CurrentWeather now;
+    std::vector<Forecast> forecast;
 };
 
+String formatWeatherBrief(const WeatherData &data);
+
+// Fonction de récupération météo
 bool fetchWeatherOpenWeather(float lat, float lon, WeatherData &out);
-String mapOWCodeToSimple(int owId);
-String severityFromAlert(const String &providerText);
