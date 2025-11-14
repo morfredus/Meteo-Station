@@ -1,9 +1,10 @@
 // ===============================================
 // Station Météo ESP32-S3
-// Version: 1.0.03-dev
+// Version: 1.0.04-dev
 // v1.0.01-dev - Correction compilation ESP32-S3 : AsyncTCP et ArduinoJson 7
 // v1.0.02-dev - Désactivation ESPAsyncWebServer (non utilisé, conflit WiFiServer.h)
 // v1.0.03-dev - Framework ESP32 stable 6.8.1 (corrige bugs WiFiClientSecure/HTTPClient)
+// v1.0.04-dev - Ajout pins SPI TFT, écran d'accueil avec progression démarrage
 // ===============================================
 
 #include <Arduino.h>
@@ -81,6 +82,55 @@ static void drawStatusBar() {
   drawWeatherIcon(tft, TFT_WIDTH-26, 0, weatherCodeToIcon(gWeather.now.conditionCode));
 }
 
+// --- [NEW FEATURE] Écran d'accueil au démarrage ---
+static void showBootScreen() {
+  tft.fillScreen(0x0000); // Fond noir
+
+  // Logo/Titre centré
+  tft.setTextColor(0x07FF); // Cyan
+  tft.setTextSize(3);
+  int16_t x = (TFT_WIDTH - 18*8) / 2; // Centrage approximatif
+  tft.setCursor(x, 60);
+  tft.println("METEO");
+  tft.setCursor(x-10, 95);
+  tft.println("STATION");
+
+  // Version
+  tft.setTextColor(0xFFE0); // Jaune
+  tft.setTextSize(1);
+  tft.setCursor(70, 130);
+  tft.print("Version ");
+  tft.println(DIAGNOSTIC_VERSION);
+
+  // Ligne de séparation
+  tft.drawFastHLine(40, 150, TFT_WIDTH-80, 0x07FF);
+
+  delay(1000);
+}
+
+static void updateBootProgress(const String &message, bool success = false) {
+  static int yPos = 170;
+
+  if (yPos > TFT_HEIGHT - 20) {
+    // Effacer la zone de progression si on déborde
+    tft.fillRect(0, 165, TFT_WIDTH, TFT_HEIGHT-165, 0x0000);
+    yPos = 170;
+  }
+
+  tft.setTextSize(1);
+  if (success) {
+    tft.setTextColor(0x07E0); // Vert
+    tft.setCursor(10, yPos);
+    tft.print("[OK] ");
+  } else {
+    tft.setTextColor(0xFFFF); // Blanc
+    tft.setCursor(10, yPos);
+    tft.print("[..] ");
+  }
+  tft.println(message);
+  yPos += 12;
+}
+
 // Pages (comme avant, inchangées)
 static void drawPageHome() { /* ... */ }
 static void drawPageForecast() { /* ... */ }
@@ -114,6 +164,7 @@ static void renderPage() {
 void setup() {
   Serial.begin(115200);
 
+  // --- [NEW FEATURE] Configuration des pins et périphériques ---
   pinMode(PIN_LED_R, OUTPUT);
   pinMode(PIN_LED_G, OUTPUT);
   pinMode(PIN_LED_B, OUTPUT);
@@ -122,16 +173,26 @@ void setup() {
 
   ledcSetup(LEDC_BL_CH, LEDC_BL_FREQ, LEDC_BL_RES);
   ledcAttachPin(PIN_TFT_BL, LEDC_BL_CH);
+  ledcWrite(LEDC_BL_CH, 255); // Rétroéclairage à fond
   ledcSetup(LEDC_BUZ_CH, LEDC_BUZ_FREQ, LEDC_BUZ_RES);
   ledcAttachPin(PIN_BUZZER, LEDC_BUZ_CH);
 
+  // Initialisation SPI avec les pins personnalisés pour le TFT
+  SPI.begin(PIN_TFT_SCL, -1, PIN_TFT_SDA, PIN_TFT_CS);
+
   tft.init(TFT_WIDTH, TFT_HEIGHT);
   tft.setRotation(0);
-  tft.fillScreen(0x0000);
 
+  // Afficher l'écran d'accueil
+  showBootScreen();
+
+  updateBootProgress("Init I2C/DHT...");
   Wire.begin(I2C_SDA, I2C_SCL);
   dht.begin();
+  delay(300);
+  updateBootProgress("Init I2C/DHT...", true);
 
+  updateBootProgress("Connexion WiFi...");
   wifiMulti.addAP(WIFI_SSID1, WIFI_PASS1);
   wifiMulti.addAP(WIFI_SSID2, WIFI_PASS2);
 
@@ -140,14 +201,32 @@ void setup() {
     if (WiFi.status()==WL_CONNECTED) break;
     delay(400);
   }
-  if (WiFi.status()==WL_CONNECTED) beepConnected();
 
+  if (WiFi.status()==WL_CONNECTED) {
+    updateBootProgress("WiFi connecte", true);
+    beepConnected();
+  } else {
+    updateBootProgress("WiFi echec", false);
+  }
+
+  updateBootProgress("Config NTP...");
   configTzTime(TZ_STRING, NTP_SERVER);
+  delay(300);
+  updateBootProgress("Config NTP...", true);
 
-  gpsBegin(); // TinyGPS++ init
+  updateBootProgress("Init GPS...");
+  gpsBegin();
+  delay(300);
+  updateBootProgress("Init GPS...", true);
 
-  telegramSend("Demarrage station.\n" + formatWeatherBrief());
+  if (WiFi.status()==WL_CONNECTED) {
+    updateBootProgress("Envoi telegram...");
+    telegramSend("Demarrage station.\n" + formatWeatherBrief());
+    delay(300);
+    updateBootProgress("Envoi telegram...", true);
+  }
 
+  delay(1500); // Pause pour lire l'écran de démarrage
   renderPage();
 }
 

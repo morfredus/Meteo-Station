@@ -1,7 +1,7 @@
 #pragma once
 
-// v1.0.03-dev - Correction compilation ESP32-S3 : WiFiClientSecure, framework stable 6.8.1
-#define DIAGNOSTIC_VERSION "1.0.03-dev"
+// v1.0.04-dev - Ajout pins SPI TFT, écran d'accueil avec progression démarrage
+#define DIAGNOSTIC_VERSION "1.0.04-dev"
 
 // Vérification de la présence du fichier secrets.h
 #ifndef __has_include
@@ -15,10 +15,13 @@
 #endif
 
 // definition des pin
+// --- [NEW FEATURE] Ajout des pins SPI pour l'écran TFT ST7789 ---
 #define PIN_TFT_CS 5
 #define PIN_TFT_DC 19
 #define PIN_TFT_RST 4
 #define PIN_TFT_BL 15
+#define PIN_TFT_SCL 18  // SPI SCK (Clock)
+#define PIN_TFT_SDA 23  // SPI MOSI (Data)
 
 #define PIN_DHT 27
 
