@@ -1,7 +1,7 @@
 #pragma once
 
-// v1.0.03-dev - Correction compilation ESP32-S3 : WiFiClientSecure, framework stable 6.8.1
-#define DIAGNOSTIC_VERSION "1.0.03-dev"
+// v1.0.02-dev - Correction compilation ESP32-S3 : AsyncTCP, ArduinoJson 7, ESPAsyncWebServer
+#define DIAGNOSTIC_VERSION "1.0.4"
 
 // Vérification de la présence du fichier secrets.h
 #ifndef __has_include

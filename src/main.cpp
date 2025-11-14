@@ -1,9 +1,7 @@
 // ===============================================
 // Station Météo ESP32-S3
-// Version: 1.0.03-dev
-// v1.0.01-dev - Correction compilation ESP32-S3 : AsyncTCP et ArduinoJson 7
-// v1.0.02-dev - Désactivation ESPAsyncWebServer (non utilisé, conflit WiFiServer.h)
-// v1.0.03-dev - Framework ESP32 stable 6.8.1 (corrige bugs WiFiClientSecure/HTTPClient)
+// Version: 1.0.4
+// L'historique des changements est maintenant dans CHANGELOG.md
 // ===============================================
 
 #include <Arduino.h>
@@ -20,6 +18,7 @@
 #include "weather.h"
 #include "gps.h"
 #include "telemetry.h"
+#include "buttons.h"
 
 WiFiMulti wifiMulti;
 
@@ -116,9 +115,7 @@ void setup() {
   pinMode(PIN_LED_R, OUTPUT);
   pinMode(PIN_LED_G, OUTPUT);
   pinMode(PIN_LED_B, OUTPUT);
-  pinMode(PIN_BTN1, INPUT);
-  pinMode(PIN_BTN2, INPUT);
-
+  
   ledcSetup(LEDC_BL_CH, LEDC_BL_FREQ, LEDC_BL_RES);
   ledcAttachPin(PIN_TFT_BL, LEDC_BL_CH);
   ledcSetup(LEDC_BUZ_CH, LEDC_BUZ_FREQ, LEDC_BUZ_RES);
@@ -127,6 +124,8 @@ void setup() {
   tft.init(TFT_WIDTH, TFT_HEIGHT);
   tft.setRotation(0);
   tft.fillScreen(0x0000);
+
+  Buttons::setup();
 
   Wire.begin(I2C_SDA, I2C_SCL);
   dht.begin();
@@ -151,22 +150,8 @@ void setup() {
 }
 
 void loop() {
-  // Boutons navigation
-  static int lastBtn1=HIGH, lastBtn2=HIGH;
-  int b1 = digitalRead(PIN_BTN1);
-  int b2 = digitalRead(PIN_BTN2);
-  if (b1==LOW && lastBtn1==HIGH) {
-    currentPage = (Page)((currentPage + 1) % 5);
-    renderPage();
-  }
-  if (b2==LOW && lastBtn2==HIGH) {
-    currentPage = (Page)((currentPage + 4) % 5);
-    renderPage();
-  }
-  lastBtn1 = b1; lastBtn2 = b2;
-
-  // GPS loop (non bloquant)
-  static GpsFix fix{false, DEFAULT_LAT, DEFAULT_LON, 0, false};
+  Buttons::loop();
+  
   gpsLoop(fix);
   if (fix.hasFix) {
     gLat = fix.lat;
