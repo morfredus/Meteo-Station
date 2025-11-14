@@ -1,7 +1,7 @@
 #pragma once
 
-// v1.0.01-dev - Correction compilation ESP32-S3 : AsyncTCP et ArduinoJson 7
-#define DIAGNOSTIC_VERSION "1.0.01-dev"
+// v1.0.02-dev - Correction compilation ESP32-S3 : AsyncTCP, ArduinoJson 7, ESPAsyncWebServer
+#define DIAGNOSTIC_VERSION "1.0.02-dev"
 
 // Vérification de la présence du fichier secrets.h
 #ifndef __has_include
