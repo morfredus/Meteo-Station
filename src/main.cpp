@@ -1,10 +1,11 @@
 // ===============================================
 // Station Météo ESP32-S3
-// Version: 1.0.04-dev
+// Version: 1.0.05-dev
 // v1.0.01-dev - Correction compilation ESP32-S3 : AsyncTCP et ArduinoJson 7
 // v1.0.02-dev - Désactivation ESPAsyncWebServer (non utilisé, conflit WiFiServer.h)
 // v1.0.03-dev - Framework ESP32 stable 6.8.1 (corrige bugs WiFiClientSecure/HTTPClient)
 // v1.0.04-dev - Ajout pins SPI TFT, écran d'accueil avec progression démarrage
+// v1.0.05-dev - Rotation 90°, pages complètes, correction WiFi, debug météo
 // ===============================================
 
 #include <Arduino.h>
@@ -29,7 +30,22 @@ WiFiMulti wifiMulti;
 Adafruit_ST7789 tft = Adafruit_ST7789(PIN_TFT_CS, PIN_TFT_DC, PIN_TFT_RST);
 DHT dht(PIN_DHT, DHT22); // bascule vers DHT11 si besoin
 
-WeatherData gWeather;
+// --- [FIX] Initialisation explicite des données météo ---
+WeatherData gWeather = {
+  .now = {
+    .tempNow = NAN,
+    .conditionCode = 0,
+    .humidity = NAN,
+    .wind = NAN,
+    .tempMin = NAN,
+    .tempMax = NAN,
+    .hasAlert = false,
+    .alertTitle = "",
+    .alertDesc = "",
+    .alertSeverity = ""
+  },
+  .forecast = {}
+};
 float gTempInt = NAN, gHumInt = NAN;
 double gLat = DEFAULT_LAT, gLon = DEFAULT_LON;
 bool gUseDefaultGeo = true;
@@ -66,19 +82,24 @@ static uint8_t wifiBars() {
   return 0;
 }
 
-// Barre d’état
+// --- [FIX] Barre d'état corrigée (WiFi, températures, icône météo) ---
 static void drawStatusBar() {
   tft.fillRect(0,0,TFT_WIDTH,20,0x0000);
-  drawWifiIcon(tft, 2, 1, wifiBars(), WiFi.status()!=WL_CONNECTED);
 
+  // Icône WiFi (UNE seule fois, avec logique inversée)
+  bool notConnected = (WiFi.status() != WL_CONNECTED);
+  drawWifiIcon(tft, 2, 1, wifiBars(), notConnected);
+
+  // Températures
   String tPrev = isnan(gWeather.now.tempNow) ? "--.-" : String(gWeather.now.tempNow,1);
   String tInt  = isnan(gTempInt) ? "--.-" : String(gTempInt,1);
-  String line = "Prev " + tPrev + "°  Int " + String(tInt) + "°";
-  tft.setCursor(70,4);
+  String line = "Ext " + tPrev + "C Int " + tInt + "C";
+  tft.setCursor(32,4);
   tft.setTextColor(0xFFFF);
   tft.setTextSize(1);
   tft.print(line);
 
+  // Icône météo
   drawWeatherIcon(tft, TFT_WIDTH-26, 0, weatherCodeToIcon(gWeather.now.conditionCode));
 }
 
@@ -131,12 +152,276 @@ static void updateBootProgress(const String &message, bool success = false) {
   yPos += 12;
 }
 
-// Pages (comme avant, inchangées)
-static void drawPageHome() { /* ... */ }
-static void drawPageForecast() { /* ... */ }
-static void drawPageAlert() { /* ... */ }
-static void drawPageSensors() { /* ... */ }
-static void drawPageSystem() { /* ... */ }
+// --- [NEW FEATURE] Implémentation complète des pages ---
+
+static void drawPageHome() {
+  tft.fillRect(0, 20, TFT_WIDTH, TFT_HEIGHT-20, 0x0000);
+
+  // Titre
+  tft.setTextColor(0x07FF);
+  tft.setTextSize(2);
+  tft.setCursor(10, 30);
+  tft.println("METEO ACTUELLE");
+
+  // Température principale
+  tft.setTextColor(0xFFE0);
+  tft.setTextSize(4);
+  tft.setCursor(40, 60);
+  if (!isnan(gWeather.now.tempNow)) {
+    tft.print(gWeather.now.tempNow, 1);
+    tft.println(" C");
+  } else {
+    tft.println("--.-C");
+  }
+
+  // Min/Max
+  tft.setTextSize(1);
+  tft.setTextColor(0x07E0);
+  tft.setCursor(10, 110);
+  tft.print("Min:");
+  if (!isnan(gWeather.now.tempMin)) tft.print(gWeather.now.tempMin,1);
+  else tft.print("--.-");
+  tft.print("C  Max:");
+  if (!isnan(gWeather.now.tempMax)) tft.print(gWeather.now.tempMax,1);
+  else tft.print("--.-");
+  tft.println("C");
+
+  // Humidité et vent
+  tft.setTextColor(0xFFFF);
+  tft.setCursor(10, 130);
+  tft.print("Humidite: ");
+  if (!isnan(gWeather.now.humidity)) tft.print(gWeather.now.humidity,0);
+  else tft.print("--");
+  tft.println(" %");
+
+  tft.setCursor(10, 145);
+  tft.print("Vent: ");
+  if (!isnan(gWeather.now.wind)) tft.print(gWeather.now.wind,1);
+  else tft.print("--.-");
+  tft.println(" m/s");
+
+  // Condition météo
+  tft.setCursor(10, 165);
+  tft.setTextColor(0x07FF);
+  tft.print("Code: ");
+  tft.println(gWeather.now.conditionCode);
+
+  // Icône grande
+  drawWeatherIcon(tft, 180, 60, weatherCodeToIcon(gWeather.now.conditionCode));
+
+  // Navigation
+  tft.setTextColor(0xC618);
+  tft.setTextSize(1);
+  tft.setCursor(10, TFT_HEIGHT-15);
+  tft.print("BTN1:Page suiv. BTN2:Page prec.");
+}
+
+static void drawPageForecast() {
+  tft.fillRect(0, 20, TFT_WIDTH, TFT_HEIGHT-20, 0x0000);
+
+  tft.setTextColor(0x07FF);
+  tft.setTextSize(2);
+  tft.setCursor(10, 30);
+  tft.println("PREVISIONS");
+
+  int yPos = 60;
+  if (gWeather.forecast.empty()) {
+    tft.setTextColor(0xF800);
+    tft.setTextSize(1);
+    tft.setCursor(10, yPos);
+    tft.println("Aucune prevision disponible");
+  } else {
+    tft.setTextSize(1);
+    for (size_t i = 0; i < gWeather.forecast.size() && i < 3; i++) {
+      const Forecast &f = gWeather.forecast[i];
+
+      tft.setTextColor(0xFFE0);
+      tft.setCursor(10, yPos);
+      tft.print("Jour ");
+      tft.println(i+1);
+
+      tft.setTextColor(0xFFFF);
+      tft.setCursor(20, yPos+15);
+      tft.print("Journee: ");
+      tft.print(f.tempDay, 1);
+      tft.println("C");
+
+      tft.setCursor(20, yPos+30);
+      tft.print("Nuit: ");
+      tft.print(f.tempNight, 1);
+      tft.println("C");
+
+      tft.setCursor(20, yPos+45);
+      tft.print("Code: ");
+      tft.println(f.conditionCode);
+
+      drawWeatherIcon(tft, 180, yPos+10, weatherCodeToIcon(f.conditionCode));
+
+      yPos += 70;
+    }
+  }
+
+  tft.setTextColor(0xC618);
+  tft.setTextSize(1);
+  tft.setCursor(10, TFT_HEIGHT-15);
+  tft.print("BTN1:Page suiv. BTN2:Page prec.");
+}
+
+static void drawPageAlert() {
+  tft.fillRect(0, 20, TFT_WIDTH, TFT_HEIGHT-20, 0x0000);
+
+  tft.setTextColor(0x07FF);
+  tft.setTextSize(2);
+  tft.setCursor(10, 30);
+  tft.println("ALERTES METEO");
+
+  if (!gWeather.now.hasAlert) {
+    tft.setTextColor(0x07E0);
+    tft.setTextSize(2);
+    tft.setCursor(30, 100);
+    tft.println("Pas d'alerte");
+  } else {
+    // Titre de l'alerte
+    tft.setTextColor(0xF800);
+    tft.setTextSize(1);
+    tft.setCursor(10, 60);
+    tft.println(gWeather.now.alertTitle);
+
+    // Sévérité
+    tft.setTextColor(0xFFE0);
+    tft.setCursor(10, 80);
+    tft.print("Niveau: ");
+    tft.println(gWeather.now.alertSeverity);
+
+    // Description (limitée pour tenir sur l'écran)
+    tft.setTextColor(0xFFFF);
+    tft.setCursor(10, 100);
+    String desc = gWeather.now.alertDesc;
+    if (desc.length() > 200) desc = desc.substring(0, 197) + "...";
+    tft.println(desc);
+  }
+
+  tft.setTextColor(0xC618);
+  tft.setTextSize(1);
+  tft.setCursor(10, TFT_HEIGHT-15);
+  tft.print("BTN1:Page suiv. BTN2:Page prec.");
+}
+
+static void drawPageSensors() {
+  tft.fillRect(0, 20, TFT_WIDTH, TFT_HEIGHT-20, 0x0000);
+
+  tft.setTextColor(0x07FF);
+  tft.setTextSize(2);
+  tft.setCursor(10, 30);
+  tft.println("CAPTEURS LOCAUX");
+
+  // DHT22
+  tft.setTextColor(0xFFE0);
+  tft.setTextSize(1);
+  tft.setCursor(10, 60);
+  tft.println("DHT22 (Interieur):");
+
+  tft.setTextColor(0xFFFF);
+  tft.setCursor(20, 75);
+  tft.print("Temperature: ");
+  if (!isnan(gTempInt)) tft.print(gTempInt,1);
+  else tft.print("--.-");
+  tft.println(" C");
+
+  tft.setCursor(20, 90);
+  tft.print("Humidite: ");
+  if (!isnan(gHumInt)) tft.print(gHumInt,0);
+  else tft.print("--");
+  tft.println(" %");
+
+  // GPS
+  tft.setTextColor(0xFFE0);
+  tft.setCursor(10, 120);
+  tft.println("GPS:");
+
+  tft.setTextColor(0xFFFF);
+  tft.setCursor(20, 135);
+  tft.print("Lat: ");
+  tft.println(gLat, 5);
+
+  tft.setCursor(20, 150);
+  tft.print("Lon: ");
+  tft.println(gLon, 5);
+
+  tft.setCursor(20, 165);
+  if (gUseDefaultGeo) {
+    tft.setTextColor(0xF800);
+    tft.println("(Position par defaut)");
+  } else {
+    tft.setTextColor(0x07E0);
+    tft.println("(Position GPS)");
+  }
+
+  tft.setTextColor(0xC618);
+  tft.setTextSize(1);
+  tft.setCursor(10, TFT_HEIGHT-15);
+  tft.print("BTN1:Page suiv. BTN2:Page prec.");
+}
+
+static void drawPageSystem() {
+  tft.fillRect(0, 20, TFT_WIDTH, TFT_HEIGHT-20, 0x0000);
+
+  tft.setTextColor(0x07FF);
+  tft.setTextSize(2);
+  tft.setCursor(10, 30);
+  tft.println("SYSTEME");
+
+  // Version
+  tft.setTextColor(0xFFE0);
+  tft.setTextSize(1);
+  tft.setCursor(10, 60);
+  tft.print("Version: ");
+  tft.println(DIAGNOSTIC_VERSION);
+
+  // WiFi
+  tft.setTextColor(0xFFFF);
+  tft.setCursor(10, 80);
+  tft.print("WiFi: ");
+  if (WiFi.status() == WL_CONNECTED) {
+    tft.setTextColor(0x07E0);
+    tft.println("Connecte");
+    tft.setTextColor(0xFFFF);
+    tft.setCursor(10, 95);
+    tft.print("SSID: ");
+    tft.println(WiFi.SSID());
+    tft.setCursor(10, 110);
+    tft.print("IP: ");
+    tft.println(WiFi.localIP());
+    tft.setCursor(10, 125);
+    tft.print("RSSI: ");
+    tft.print(WiFi.RSSI());
+    tft.println(" dBm");
+  } else {
+    tft.setTextColor(0xF800);
+    tft.println("Deconnecte");
+  }
+
+  // Mémoire
+  tft.setTextColor(0xFFFF);
+  tft.setCursor(10, 150);
+  tft.print("RAM libre: ");
+  tft.print(ESP.getFreeHeap() / 1024);
+  tft.println(" KB");
+
+  // Uptime
+  tft.setCursor(10, 165);
+  tft.print("Uptime: ");
+  unsigned long uptime = millis() / 1000;
+  tft.print(uptime / 3600);
+  tft.print("h ");
+  tft.print((uptime % 3600) / 60);
+  tft.println("m");
+
+  tft.setTextColor(0xC618);
+  tft.setTextSize(1);
+  tft.setCursor(10, TFT_HEIGHT-15);
+  tft.print("BTN1:Page suiv. BTN2:Page prec.");
+}
 
 static void updateBacklightAndRgbByLuminosity() {
   bool lowLum = false; // TODO: remplacer par BH1750/LDR
@@ -179,7 +464,7 @@ void setup() {
   SPI.begin(PIN_TFT_SCL, -1, PIN_TFT_SDA, PIN_TFT_CS);
 
   tft.init(TFT_WIDTH, TFT_HEIGHT);
-  tft.setRotation(0);
+  tft.setRotation(1); // --- [FIX] Rotation 90° (pins en haut)
 
   // Afficher l'écran d'accueil
   showBootScreen();

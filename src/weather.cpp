@@ -52,12 +52,20 @@ bool fetchWeatherOpenWeather(float lat, float lon, WeatherData &out) {
         return false;
     }
 
+    // --- [DEBUG] Affichage des premiers caractères de la réponse ---
+    Serial.print("Payload recu (");
+    Serial.print(payload.length());
+    Serial.println(" octets):");
+    Serial.println(payload.substring(0, min(200, (int)payload.length())));
+
     // --- [FIX] ArduinoJson 7 : utilisation de JsonDocument au lieu de DynamicJsonDocument ---
     JsonDocument doc;
     DeserializationError err = deserializeJson(doc, payload);
     if (err) {
         Serial.print("Erreur JSON: ");
         Serial.println(err.c_str());
+        Serial.print("Code erreur: ");
+        Serial.println((int)err.code());
         return false;
     }
 

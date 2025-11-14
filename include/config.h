@@ -1,7 +1,7 @@
 #pragma once
 
-// v1.0.04-dev - Ajout pins SPI TFT, écran d'accueil avec progression démarrage
-#define DIAGNOSTIC_VERSION "1.0.04-dev"
+// v1.0.05-dev - Rotation 90°, pages complètes, correction WiFi, debug météo
+#define DIAGNOSTIC_VERSION "1.0.05-dev"
 
 // Vérification de la présence du fichier secrets.h
 #ifndef __has_include
