@@ -5,6 +5,30 @@ Toutes les modifications notables de ce projet seront documentées dans ce fichi
 Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/),
 et ce projet adhère au [Semantic Versioning](https://semver.org/lang/fr/).
 
+## [1.0.05-dev] - 2025-11-14
+
+### Ajouté
+- Implémentation complète de toutes les pages :
+  - **Page HOME** : Météo actuelle avec température, min/max, humidité, vent
+  - **Page FORECAST** : Prévisions sur 3 jours avec températures jour/nuit
+  - **Page ALERT** : Alertes météo avec titre, sévérité et description
+  - **Page SENSORS** : Données capteurs locaux (DHT22, GPS)
+  - **Page SYSTEM** : Informations système (version, WiFi, RAM, uptime)
+- Navigation entre pages fonctionnelle via boutons BTN1/BTN2
+- Logs de debug pour la récupération des données OpenWeather
+
+### Modifié
+- Rotation de l'écran à 90° (pins en haut) via `setRotation(1)`
+- Barre d'état commune à toutes les pages (ligne du haut)
+- Amélioration de l'affichage des températures : "Ext" et "Int" au lieu de "Prev"
+- Initialisation explicite de WeatherData avec valeurs NAN par défaut
+
+### Corrigé
+- **Icône WiFi barrée** : Correction de la logique inversée (était affichée barrée quand connecté)
+- Suppression de l'icône WiFi dupliquée dans la barre d'état
+- Initialisation correcte des structures de données météo
+- Affichage des codes erreur JSON pour faciliter le debug
+
 ## [1.0.04-dev] - 2025-11-14
 
 ### Ajouté
