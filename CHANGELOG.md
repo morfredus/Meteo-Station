@@ -1,49 +1,72 @@
 # Changelog
 
-Toutes les modifications notables apportées à ce projet seront documentées dans ce fichier.
+Toutes les modifications notables de ce projet seront documentées dans ce fichier.
 
-Le format est basé sur [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/),
+et ce projet adhère au [Semantic Versioning](https://semver.org/lang/fr/).
 
-## [1.0.6] - 2024-05-21
+## [1.0.04-dev] - 2025-11-14
 
-### Fixed
-- **Affichage :** L'écran ne reste plus noir au démarrage. Le rétroéclairage est maintenant activé à la fin de la fonction `setup()`.
-- **Démarrage :** La recherche initiale du signal GPS est maintenant limitée à 15 secondes pour ne pas bloquer indéfiniment le démarrage.
+### Ajouté
+- Ajout des pins SPI pour l'écran TFT ST7789 (PIN_TFT_SCL=18, PIN_TFT_SDA=23)
+- Écran d'accueil au démarrage affichant :
+  - Logo "METEO STATION" stylisé
+  - Numéro de version
+  - Progression de la connexion WiFi
+  - Progression de l'initialisation GPS
+  - Statut de chaque étape (I2C, DHT, NTP, Telegram)
+- Initialisation SPI personnalisée avec les pins du TFT
+- Rétroéclairage TFT à fond au démarrage
 
-### Changed
-- **Code :** Ajout de conversions explicites vers le type `String` pour éliminer les avertissements de compilation.
-- **Démarrage :** La boucle de connexion WiFi et d'acquisition GPS dans `setup()` est maintenant non-bloquante et s'exécute en parallèle.
+### Modifié
+- Refonte du `setup()` pour inclure l'affichage de progression
+- Amélioration de la visibilité du démarrage avec messages d'état
 
-## [1.0.5] - 2024-05-21
+## [1.0.03-dev] - 2025-11-14
 
-### Fixed
-- **Compilation :** Correction d'erreurs de compilation dues à des incohérences de déclaration entre `main.cpp` et `buttons.h` après refactorisation.
-  - Alignement du type de l'énumération `Page` (`enum Page : int`).
-  - Correction du linkage de la fonction `renderPage()` (retrait de `static`).
-  - Ré-ajout de la déclaration de la variable `fix` dans la fonction `loop()`.
+### Modifié
+- Downgrade vers le framework ESP32 stable 6.8.1 (Arduino ESP32 2.0.17)
+- Correction des erreurs de compilation WiFiClientSecure
 
-## [1.0.4] - 2024-05-21
+### Corrigé
+- Erreur variable membre `_connected` manquante dans WiFiClientSecure
+- Erreur méthode `setSocketOption()` non déclarée
+- Erreur incompatibilité signature `connect()` dans HTTPClient
 
-### Added
-- Création du fichier `CHANGELOG.md` pour centraliser et suivre l'historique des versions du projet.
+## [1.0.02-dev] - 2025-11-14
 
-### Changed
-- L'historique des versions a été retiré de l'en-tête de `main.cpp` pour éviter la redondance.
+### Modifié
+- Désactivation temporaire de la bibliothèque ESPAsyncWebServer (non utilisée)
 
-## [1.0.3] - 2024-05-21
+### Corrigé
+- Erreur de compilation `WiFiServer.h: No such file or directory`
+- Conflit de dépendances entre WebServer et ESP32-S3
 
-### Added
-- Ajout d'un système d'anti-rebond logiciel (`debounce`) pour les boutons de navigation, améliorant la fiabilité des appuis.
+## [1.0.01-dev] - 2025-11-14
 
-### Changed
-- **Refactorisation :** La logique de gestion des boutons a été extraite de `main.cpp` vers un fichier dédié `include/buttons.h` pour une meilleure organisation du code.
+### Ajouté
+- Directive `lib_ignore = ESPAsyncTCP` dans platformio.ini
+- Support complet pour ArduinoJson 7
 
-### Fixed
-- **Compilation :** Résolution de multiples erreurs de compilation en figeant la version du framework `espressif32` à `6.6.0` pour garantir la compatibilité des bibliothèques (`WiFiClientSecure`, `HTTPClient`).
-- **Configuration :** Correction du type de carte dans `platformio.ini` de `esp32-s3-devkitc-1` à `upesy_wroom` pour correspondre au matériel réel.
-- **Dépendances :** Suppression de la bibliothèque `arduino-libraries/WiFi` conflictuelle dans `platformio.ini`.
+### Modifié
+- Remplacement de `DynamicJsonDocument` par `JsonDocument` dans weather.cpp
+- Migration vers ArduinoJson 7 (allocation mémoire automatique)
 
-## [Versions de développement initiales] - Avant 1.0.3
+### Corrigé
+- Erreurs de compilation ESPAsyncTCP sur ESP32-S3
+- Avertissements de dépréciation ArduinoJson 7
+- Conflits entre ESPAsyncTCP (ESP8266) et AsyncTCP (ESP32)
 
-- **v1.0.01-dev à v1.0.03-dev :** Diverses tentatives de corrections de compilation liées aux bibliothèques (`AsyncTCP`, `ArduinoJson 7`) et aux versions du framework ESP32.
+## [1.0.0] - Initial
+
+### Ajouté
+- Station météo complète sur ESP32-S3
+- Support TFT 1.54" ST7789
+- Intégration API OpenWeather
+- Support GPS avec TinyGPS++
+- Notifications Telegram
+- Capteurs DHT22, BMP280, BME280
+- Interface multi-pages (Home, Forecast, Alert, Sensors, System)
+- LED RGB pour alertes météo
+- Buzzer pour notifications
+- Mode économie d'énergie avec backlight adaptatif
