@@ -1,6 +1,6 @@
 // ===============================================
 // Station Météo ESP32-S3
-// Version: 1.0.4
+// Version: 1.0.6
 // L'historique des changements est maintenant dans CHANGELOG.md
 // ===============================================
 
@@ -31,7 +31,7 @@ float gTempInt = NAN, gHumInt = NAN;
 double gLat = DEFAULT_LAT, gLon = DEFAULT_LON;
 bool gUseDefaultGeo = true;
 
-enum Page { PAGE_HOME, PAGE_FORECAST, PAGE_ALERT, PAGE_SENSORS, PAGE_SYSTEM };
+enum Page : int { PAGE_HOME, PAGE_FORECAST, PAGE_ALERT, PAGE_SENSORS, PAGE_SYSTEM };
 Page currentPage = PAGE_HOME;
 
 unsigned long lastSensorMs=0, lastWeatherMs=0, lastGpsTryMs=0, lastNtpMs=0;
@@ -70,7 +70,7 @@ static void drawStatusBar() {
 
   String tPrev = isnan(gWeather.now.tempNow) ? "--.-" : String(gWeather.now.tempNow,1);
   String tInt  = isnan(gTempInt) ? "--.-" : String(gTempInt,1);
-  String line = "Prev " + tPrev + "°  Int " + tInt + "°";
+  String line = "Prev " + tPrev + "°  Int " + String(tInt) + "°";
   tft.setCursor(70,4);
   tft.setTextColor(0xFFFF);
   tft.setTextSize(1);
@@ -98,7 +98,7 @@ static void updateBacklightAndRgbByLuminosity() {
   else setRgb(0,255,0);
 }
 
-static void renderPage() {
+void renderPage() {
   drawStatusBar();
   switch (currentPage) {
     case PAGE_HOME: drawPageHome(); break;
@@ -133,25 +133,37 @@ void setup() {
   wifiMulti.addAP(WIFI_SSID1, WIFI_PASS1);
   wifiMulti.addAP(WIFI_SSID2, WIFI_PASS2);
 
-  for (int i=0;i<15;i++) {
-    wifiMulti.run();
-    if (WiFi.status()==WL_CONNECTED) break;
-    delay(400);
+  configTzTime(TZ_STRING, NTP_SERVER);
+  gpsBegin(); // TinyGPS++ init
+
+  // Boucle de démarrage non-bloquante (WiFi + GPS) pendant 15s max
+  unsigned long startAttempt = millis();
+  while(millis() - startAttempt < 15000) {
+    if (WiFi.status() != WL_CONNECTED) {
+      wifiMulti.run();
+    }
+    static GpsFix fix;
+    gpsLoop(fix);
+    if (fix.hasFix) {
+      gUseDefaultGeo = false;
+      gLat = fix.lat;
+      gLon = fix.lon;
+    }
+    if (WiFi.status() == WL_CONNECTED && gUseDefaultGeo == false) break; // Sortir si tout est OK
+    delay(50);
   }
   if (WiFi.status()==WL_CONNECTED) beepConnected();
-
-  configTzTime(TZ_STRING, NTP_SERVER);
-
-  gpsBegin(); // TinyGPS++ init
 
   telegramSend("Demarrage station.\n" + String(formatWeatherBrief()));
 
   renderPage();
+  updateBacklightAndRgbByLuminosity(); // Allumer l'écran et la LED immédiatement
 }
 
 void loop() {
   Buttons::loop();
   
+  static GpsFix fix{false, DEFAULT_LAT, DEFAULT_LON, 0, false};
   gpsLoop(fix);
   if (fix.hasFix) {
     gLat = fix.lat;
@@ -167,9 +179,9 @@ void loop() {
 
     if (WiFi.status()==WL_CONNECTED) {
       if (!isnan(gTempInt) && gTempInt >= TEMP_HIGH_ALERT)
-        telegramSend("Alerte: Temperature interieure elevee (" + String(gTempInt,1) + "°C)");
+        telegramSend("Alerte: Temperature interieure elevee (" + String(gTempInt,1) + " C)");
       if (!isnan(gTempInt) && gTempInt <= TEMP_LOW_ALERT)
-        telegramSend("Alerte: Temperature interieure basse (" + String(gTempInt,1) + "°C)");
+        telegramSend("Alerte: Temperature interieure basse (" + String(gTempInt,1) + " C)");
     }
     updateBacklightAndRgbByLuminosity();
     renderPage();
@@ -180,7 +192,7 @@ void loop() {
     lastWeatherMs = millis();
     if (fetchWeatherOpenWeather(gLat, gLon, gWeather)) {
       if (gWeather.now.hasAlert) {
-        telegramSend("Alerte meteo: " + gWeather.now.alertTitle + "\n" + gWeather.now.alertDesc);
+        telegramSend("Alerte meteo: " + String(gWeather.now.alertTitle) + "\n" + String(gWeather.now.alertDesc));
       }
       renderPage();
     }

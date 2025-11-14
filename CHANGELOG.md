@@ -5,6 +5,24 @@ Toutes les modifications notables apportées à ce projet seront documentées da
 Le format est basé sur [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.6] - 2024-05-21
+
+### Fixed
+- **Affichage :** L'écran ne reste plus noir au démarrage. Le rétroéclairage est maintenant activé à la fin de la fonction `setup()`.
+- **Démarrage :** La recherche initiale du signal GPS est maintenant limitée à 15 secondes pour ne pas bloquer indéfiniment le démarrage.
+
+### Changed
+- **Code :** Ajout de conversions explicites vers le type `String` pour éliminer les avertissements de compilation.
+- **Démarrage :** La boucle de connexion WiFi et d'acquisition GPS dans `setup()` est maintenant non-bloquante et s'exécute en parallèle.
+
+## [1.0.5] - 2024-05-21
+
+### Fixed
+- **Compilation :** Correction d'erreurs de compilation dues à des incohérences de déclaration entre `main.cpp` et `buttons.h` après refactorisation.
+  - Alignement du type de l'énumération `Page` (`enum Page : int`).
+  - Correction du linkage de la fonction `renderPage()` (retrait de `static`).
+  - Ré-ajout de la déclaration de la variable `fix` dans la fonction `loop()`.
+
 ## [1.0.4] - 2024-05-21
 
 ### Added
