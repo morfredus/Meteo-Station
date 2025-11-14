@@ -52,8 +52,8 @@ bool fetchWeatherOpenWeather(float lat, float lon, WeatherData &out) {
         return false;
     }
 
-    // Parsing JSON
-    DynamicJsonDocument doc(32 * 1024); // allocation dynamique
+    // --- [FIX] ArduinoJson 7 : utilisation de JsonDocument au lieu de DynamicJsonDocument ---
+    JsonDocument doc;
     DeserializationError err = deserializeJson(doc, payload);
     if (err) {
         Serial.print("Erreur JSON: ");

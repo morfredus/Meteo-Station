@@ -1,5 +1,8 @@
 #pragma once
 
+// v1.0.01-dev - Correction compilation ESP32-S3 : AsyncTCP et ArduinoJson 7
+#define DIAGNOSTIC_VERSION "1.0.01-dev"
+
 // Vérification de la présence du fichier secrets.h
 #ifndef __has_include
   #error "Votre compilateur ne supporte pas __has_include, impossible de vérifier secrets.h"
