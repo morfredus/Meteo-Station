@@ -68,7 +68,6 @@ static uint8_t wifiBars() {
 static void drawStatusBar() {
   tft.fillRect(0,0,TFT_WIDTH,20,0x0000);
   drawWifiIcon(tft, 2, 1, wifiBars(), WiFi.status()!=WL_CONNECTED);
-  drawWifiIcon(tft, 32, 1, wifiBars(), WiFi.status()!=WL_CONNECTED);
 
   String tPrev = isnan(gWeather.now.tempNow) ? "--.-" : String(gWeather.now.tempNow,1);
   String tInt  = isnan(gTempInt) ? "--.-" : String(gTempInt,1);
@@ -146,7 +145,7 @@ void setup() {
 
   gpsBegin(); // TinyGPS++ init
 
-  telegramSend("Demarrage station.\n" + formatWeatherBrief());
+  telegramSend("Demarrage station.\n" + String(formatWeatherBrief()));
 
   renderPage();
 }
