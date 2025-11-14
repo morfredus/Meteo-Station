@@ -464,7 +464,7 @@ void setup() {
   SPI.begin(PIN_TFT_SCL, -1, PIN_TFT_SDA, PIN_TFT_CS);
 
   tft.init(TFT_WIDTH, TFT_HEIGHT);
-  tft.setRotation(1); // --- [FIX] Rotation 90° (pins en haut)
+  tft.setRotation(TFT_ROTATION); // --- [FIX] Rotation 90° (pins en haut)
 
   // Afficher l'écran d'accueil
   showBootScreen();

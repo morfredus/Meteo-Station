@@ -22,6 +22,7 @@
 #define PIN_TFT_BL 15
 #define PIN_TFT_SCL 18  // SPI SCK (Clock)
 #define PIN_TFT_SDA 23  // SPI MOSI (Data)
+#define TFT_ROTATION 2
 
 #define PIN_DHT 27
 
