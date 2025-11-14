@@ -21,6 +21,7 @@
 #include "weather.h"
 #include "gps.h"
 #include "telemetry.h"
+#include "buttons.h"
 
 WiFiMulti wifiMulti;
 
@@ -33,7 +34,7 @@ float gTempInt = NAN, gHumInt = NAN;
 double gLat = DEFAULT_LAT, gLon = DEFAULT_LON;
 bool gUseDefaultGeo = true;
 
-enum Page { PAGE_HOME, PAGE_FORECAST, PAGE_ALERT, PAGE_SENSORS, PAGE_SYSTEM };
+enum Page : int { PAGE_HOME, PAGE_FORECAST, PAGE_ALERT, PAGE_SENSORS, PAGE_SYSTEM };
 Page currentPage = PAGE_HOME;
 
 unsigned long lastSensorMs=0, lastWeatherMs=0, lastGpsTryMs=0, lastNtpMs=0;
@@ -69,11 +70,10 @@ static uint8_t wifiBars() {
 static void drawStatusBar() {
   tft.fillRect(0,0,TFT_WIDTH,20,0x0000);
   drawWifiIcon(tft, 2, 1, wifiBars(), WiFi.status()!=WL_CONNECTED);
-  drawWifiIcon(tft, 32, 1, wifiBars(), WiFi.status()!=WL_CONNECTED);
 
   String tPrev = isnan(gWeather.now.tempNow) ? "--.-" : String(gWeather.now.tempNow,1);
   String tInt  = isnan(gTempInt) ? "--.-" : String(gTempInt,1);
-  String line = "Prev " + tPrev + "°  Int " + tInt + "°";
+  String line = "Prev " + tPrev + "°  Int " + String(tInt) + "°";
   tft.setCursor(70,4);
   tft.setTextColor(0xFFFF);
   tft.setTextSize(1);
@@ -150,7 +150,7 @@ static void updateBacklightAndRgbByLuminosity() {
   else setRgb(0,255,0);
 }
 
-static void renderPage() {
+void renderPage() {
   drawStatusBar();
   switch (currentPage) {
     case PAGE_HOME: drawPageHome(); break;
@@ -168,9 +168,7 @@ void setup() {
   pinMode(PIN_LED_R, OUTPUT);
   pinMode(PIN_LED_G, OUTPUT);
   pinMode(PIN_LED_B, OUTPUT);
-  pinMode(PIN_BTN1, INPUT);
-  pinMode(PIN_BTN2, INPUT);
-
+  
   ledcSetup(LEDC_BL_CH, LEDC_BL_FREQ, LEDC_BL_RES);
   ledcAttachPin(PIN_TFT_BL, LEDC_BL_CH);
   ledcWrite(LEDC_BL_CH, 255); // Rétroéclairage à fond
@@ -228,24 +226,12 @@ void setup() {
 
   delay(1500); // Pause pour lire l'écran de démarrage
   renderPage();
+  updateBacklightAndRgbByLuminosity(); // Allumer l'écran et la LED immédiatement
 }
 
 void loop() {
-  // Boutons navigation
-  static int lastBtn1=HIGH, lastBtn2=HIGH;
-  int b1 = digitalRead(PIN_BTN1);
-  int b2 = digitalRead(PIN_BTN2);
-  if (b1==LOW && lastBtn1==HIGH) {
-    currentPage = (Page)((currentPage + 1) % 5);
-    renderPage();
-  }
-  if (b2==LOW && lastBtn2==HIGH) {
-    currentPage = (Page)((currentPage + 4) % 5);
-    renderPage();
-  }
-  lastBtn1 = b1; lastBtn2 = b2;
-
-  // GPS loop (non bloquant)
+  Buttons::loop();
+  
   static GpsFix fix{false, DEFAULT_LAT, DEFAULT_LON, 0, false};
   gpsLoop(fix);
   if (fix.hasFix) {
@@ -262,9 +248,9 @@ void loop() {
 
     if (WiFi.status()==WL_CONNECTED) {
       if (!isnan(gTempInt) && gTempInt >= TEMP_HIGH_ALERT)
-        telegramSend("Alerte: Temperature interieure elevee (" + String(gTempInt,1) + "°C)");
+        telegramSend("Alerte: Temperature interieure elevee (" + String(gTempInt,1) + " C)");
       if (!isnan(gTempInt) && gTempInt <= TEMP_LOW_ALERT)
-        telegramSend("Alerte: Temperature interieure basse (" + String(gTempInt,1) + "°C)");
+        telegramSend("Alerte: Temperature interieure basse (" + String(gTempInt,1) + " C)");
     }
     updateBacklightAndRgbByLuminosity();
     renderPage();
@@ -275,7 +261,7 @@ void loop() {
     lastWeatherMs = millis();
     if (fetchWeatherOpenWeather(gLat, gLon, gWeather)) {
       if (gWeather.now.hasAlert) {
-        telegramSend("Alerte meteo: " + gWeather.now.alertTitle + "\n" + gWeather.now.alertDesc);
+        telegramSend("Alerte meteo: " + String(gWeather.now.alertTitle) + "\n" + String(gWeather.now.alertDesc));
       }
       renderPage();
     }
