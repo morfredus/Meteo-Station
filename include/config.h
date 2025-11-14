@@ -1,7 +1,7 @@
 #pragma once
 
-// v1.0.05-dev - Rotation 90°, pages complètes, correction WiFi, debug météo
-#define DIAGNOSTIC_VERSION "1.0.05-dev"
+// v1.0.09 - Correction erreurs de compilation (scope Buttons::)
+#define DIAGNOSTIC_VERSION "1.0.09"
 
 // Vérification de la présence du fichier secrets.h
 #ifndef __has_include

@@ -1,6 +1,9 @@
 // ===============================================
 // Station Météo ESP32-S3
-// Version: 1.0.05-dev
+// Version: 1.0.09
+// v1.0.09 - Correction erreurs de compilation (scope Buttons::)
+// v1.0.08 - Correction erreurs de compilation (scope Buttons)
+// v1.0.07 - Correction navigation pages, gestion rafraîchissement écran
 // v1.0.01-dev - Correction compilation ESP32-S3 : AsyncTCP et ArduinoJson 7
 // v1.0.02-dev - Désactivation ESPAsyncWebServer (non utilisé, conflit WiFiServer.h)
 // v1.0.03-dev - Framework ESP32 stable 6.8.1 (corrige bugs WiFiClientSecure/HTTPClient)
@@ -51,6 +54,7 @@ double gLat = DEFAULT_LAT, gLon = DEFAULT_LON;
 bool gUseDefaultGeo = true;
 
 enum Page : int { PAGE_HOME, PAGE_FORECAST, PAGE_ALERT, PAGE_SENSORS, PAGE_SYSTEM };
+const int NUM_PAGES = 5;
 Page currentPage = PAGE_HOME;
 
 unsigned long lastSensorMs=0, lastWeatherMs=0, lastGpsTryMs=0, lastNtpMs=0;
@@ -515,11 +519,25 @@ void setup() {
 }
 
 void loop() {
-  Buttons::loop();
+  // --- Gestion des événements ---
+  bool needsRender = false;
+
+  // 1. Gérer les pressions de boutons
+  Buttons::ButtonEvent event = Buttons::getEvent();
+  if (event != Buttons::BTN_EVT_NONE) {
+    if (event == Buttons::BTN_EVT_1_SHORT) {
+      currentPage = (Page)(((int)currentPage + 1) % NUM_PAGES);
+    } else if (event == Buttons::BTN_EVT_2_SHORT) {
+      currentPage = (Page)(((int)currentPage - 1 + NUM_PAGES) % NUM_PAGES);
+    }
+    needsRender = true;
+  }
   
+  // 2. Gérer le GPS
   static GpsFix fix{false, DEFAULT_LAT, DEFAULT_LON, 0, false};
   gpsLoop(fix);
   if (fix.hasFix) {
+    // Note: On ne redessine pas l'écran à chaque fix GPS pour éviter le clignotement
     gLat = fix.lat;
     gLon = fix.lon;
     gUseDefaultGeo = false;
@@ -537,8 +555,7 @@ void loop() {
       if (!isnan(gTempInt) && gTempInt <= TEMP_LOW_ALERT)
         telegramSend("Alerte: Temperature interieure basse (" + String(gTempInt,1) + " C)");
     }
-    updateBacklightAndRgbByLuminosity();
-    renderPage();
+    needsRender = true;
   }
 
   // Météo
@@ -548,8 +565,13 @@ void loop() {
       if (gWeather.now.hasAlert) {
         telegramSend("Alerte meteo: " + String(gWeather.now.alertTitle) + "\n" + String(gWeather.now.alertDesc));
       }
-      renderPage();
+      needsRender = true;
     }
+  }
+
+  // --- Rafraîchissement de l'affichage ---
+  if (needsRender) {
+    renderPage();
   }
 
   // NTP resync

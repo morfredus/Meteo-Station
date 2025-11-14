@@ -5,6 +5,38 @@ Toutes les modifications notables de ce projet seront documentées dans ce fichi
 Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/),
 et ce projet adhère au [Semantic Versioning](https://semver.org/lang/fr/).
 
+## [1.0.09] - 2023-10-27
+### Corrigé (Fixed)
+- **Erreurs de compilation (scope)** : Correction des erreurs `is not a member of 'Buttons'` pour `ButtonEvent` et les constantes `BTN_EVT_NONE`, `BTN_EVT_1_SHORT`, `BTN_EVT_2_SHORT` en retirant le préfixe `Buttons::`.
+## [1.0.08] - 2023-10-27
+
+### Corrigé (Fixed)
+- **Erreurs de compilation** : Résolution des erreurs dans `main.cpp` liées à la déclaration de `currentPage` et à l'accès aux types et énumérations de la classe `Buttons` (problème de scope).
+
+## [1.0.07] - 2023-10-27
+
+### Corrigé (Fixed)
+- **Navigation entre les pages** : La logique de changement de page via les boutons est maintenant fonctionnelle. La boucle principale (`loop`) réagit aux événements des boutons pour changer la page courante.
+- **Rafraîchissement de l'affichage** : L'écran est désormais redessiné uniquement lorsqu'un changement de page ou une mise à jour de données le nécessite, assurant une interface fluide et réactive.
+
+### Modifié (Changed)
+- **Gestion des événements** : La boucle principale a été restructurée pour gérer de manière centralisée les événements (boutons, mises à jour de capteurs) et déclencher les actions correspondantes (changement de page, rafraîchissement).
+- **Version du firmware** : La version a été incrémentée à `1.0.07` dans `config.h`.
+
+## [1.0.06] - 2023-10-27
+
+### Corrigé (Fixed)
+
+- **Logique des boutons** : Correction de la détection des pressions de bouton qui empêchait le changement de page. Implémentation d'un anti-rebond (debounce) pour une détection fiable.
+- **Parsing des données météo** : Correction de l'analyse de la réponse JSON de l'API OpenWeatherMap. Les valeurs de température, vent, etc., sont désormais correctement extraites des objets imbriqués (`main`, `wind`).
+- **Affichage des données** : Les valeurs affichées sur l'écran et envoyées via Telegram sont maintenant correctes au lieu de s'afficher à `0` ou `NaN`.
+
+### Modifié (Changed)
+
+- **Gestion de l'affichage** : L'écran n'est effacé que lors d'un changement de page ou d'une mise à jour des données, ce qui élimine le clignotement constant.
+- **Structure de la boucle principale** : La fonction `loop()` a été réorganisée pour une meilleure gestion des états (boutons, rafraîchissement écran).
+- **Mise à jour de la version** : La version du firmware est passée à `1.0.06` pour refléter ces corrections.
+
 ## [1.0.05-dev] - 2025-11-14
 
 ### Ajouté
