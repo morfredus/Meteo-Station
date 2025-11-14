@@ -1,3 +1,9 @@
+// ===============================================
+// Station Météo ESP32-S3
+// Version: 1.0.01-dev
+// v1.0.01-dev - Correction compilation ESP32-S3 : AsyncTCP et ArduinoJson 7
+// ===============================================
+
 #include <Arduino.h>
 #include <WiFi.h>
 #include <WiFiMulti.h>
