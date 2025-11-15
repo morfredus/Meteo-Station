@@ -60,4 +60,4 @@ void loop() {
   Serial.println("-------------------------");
   // Pause de 5 secondes avant le prochain scan
   delay(5000); 
-}
+} 
