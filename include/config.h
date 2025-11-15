@@ -41,7 +41,7 @@
 // Capteur GY-BME280 / OLED (I2C)
 #define I2C_SDA 21       // GPIO 21 : I2C Data (SDA) - Utilisé par BME280
 #define I2C_SCL 22       // GPIO 22 : I2C Clock (SCL) - Utilisé par BME280
-#define I2C_ADDRESS_BME280  0x77 // 0x76 OU 0x77 selon le câblage 
+#define I2C_ADDRESS_BME280  0x76 // 0x76 OU 0x77 selon le câblage 
 
 #define LEDC_BL_CH 0
 #define LEDC_BL_FREQ 5000
