@@ -1,6 +1,7 @@
 // ===============================================
 // Station Météo ESP32-S3
-// Version: 1.0.17-dev
+// Version: 1.0.18-dev
+// v1.0.18-dev - Fix logique boutons (HIGH->LOW avec pull-up), diagnostic au boot
 // v1.0.17-dev - Correction logique boutons (pull-down), ajout logs debug meteo/capteurs
 // v1.0.16-dev - Remplacement DHT22 par BME280, nettoyage buttons.h
 // v1.0.15 - Correction du conflit de broches des boutons avec les LEDs RGB
@@ -74,12 +75,12 @@ enum ButtonEvent {
 
 const unsigned long DEBOUNCE_DELAY = 50;
 
-// --- [FIX] Logique inversée pour boutons avec pull-down (GPIO 34 n'a pas de pull-up interne) ---
+// --- [FIX] Détection front descendant (pull-up externe pour GPIO34, interne pour GPIO27) ---
 ButtonEvent getButtonEvent() {
   static unsigned long lastBtn1Press = 0;
   static unsigned long lastBtn2Press = 0;
-  static int lastBtn1State = LOW;  // État initial LOW (pull-down)
-  static int lastBtn2State = LOW;  // État initial LOW (pull-down)
+  static int lastBtn1State = HIGH;  // État initial HIGH (pull-up)
+  static int lastBtn2State = HIGH;  // État initial HIGH (pull-up)
 
   // Lecture de l'état actuel des boutons
   int btn1State = digitalRead(PIN_BTN1);
@@ -87,18 +88,18 @@ ButtonEvent getButtonEvent() {
 
   ButtonEvent event = BTN_EVT_NONE;
 
-  // --- [FIX] Détection du front montant (LOW -> HIGH) pour boutons avec pull-down ---
-  // Gestion du bouton 1
-  if (btn1State == HIGH && lastBtn1State == LOW && (millis() - lastBtn1Press > DEBOUNCE_DELAY)) {
+  // --- [FIX] Détection du front descendant (HIGH -> LOW) pour boutons avec pull-up ---
+  // Gestion du bouton 1 - Page suivante
+  if (btn1State == LOW && lastBtn1State == HIGH && (millis() - lastBtn1Press > DEBOUNCE_DELAY)) {
     lastBtn1Press = millis();
     event = BTN_EVT_1_SHORT;
-    Serial.println("[BTN] Bouton 1 presse");
+    Serial.println("[BTN] Bouton 1 presse - Page suivante");
   }
-  // Gestion du bouton 2
-  if (btn2State == HIGH && lastBtn2State == LOW && (millis() - lastBtn2Press > DEBOUNCE_DELAY)) {
+  // Gestion du bouton 2 - Page précédente
+  if (btn2State == LOW && lastBtn2State == HIGH && (millis() - lastBtn2Press > DEBOUNCE_DELAY)) {
     lastBtn2Press = millis();
     event = BTN_EVT_2_SHORT;
-    Serial.println("[BTN] Bouton 2 presse");
+    Serial.println("[BTN] Bouton 2 presse - Page precedente");
   }
 
   // Mettre à jour l'état des boutons à chaque cycle pour une détection fiable
@@ -516,9 +517,23 @@ void setup() {
   ledcAttachPin(PIN_BUZZER, LEDC_BUZ_CH);
 
   // --- [FIX] Configuration des pins des boutons ---
-  // GPIO 34 est INPUT-ONLY sans pull-up interne, on suppose pull-down externe
-  pinMode(PIN_BTN1, INPUT);
-  pinMode(PIN_BTN2, INPUT);
+  // GPIO 34 (BTN1) : INPUT-ONLY sans pull-up interne, pull-up externe requise
+  // GPIO 27 (BTN2) : GPIO normal, peut utiliser pull-up interne
+  pinMode(PIN_BTN1, INPUT);          // Pull-up externe sur le hardware
+  pinMode(PIN_BTN2, INPUT_PULLUP);   // Pull-up interne activée
+
+  // Test diagnostic des boutons au démarrage
+  delay(100); // Laisser les pins se stabiliser
+  Serial.println("\n[DIAGNOSTIC] Test etat initial boutons:");
+  Serial.print("[DIAGNOSTIC] BTN1 (GPIO ");
+  Serial.print(PIN_BTN1);
+  Serial.print(") = ");
+  Serial.println(digitalRead(PIN_BTN1) == HIGH ? "HIGH (relache)" : "LOW (presse)");
+  Serial.print("[DIAGNOSTIC] BTN2 (GPIO ");
+  Serial.print(PIN_BTN2);
+  Serial.print(") = ");
+  Serial.println(digitalRead(PIN_BTN2) == HIGH ? "HIGH (relache)" : "LOW (presse)");
+  Serial.println("[DIAGNOSTIC] Si les boutons sont relaches, ils doivent etre HIGH\n");
 
   // Initialisation SPI avec les pins personnalisés pour le TFT
   SPI.begin(PIN_TFT_SCL, -1, PIN_TFT_SDA, PIN_TFT_CS);
@@ -603,9 +618,19 @@ void loop() {
   ButtonEvent event = getButtonEvent();
   if (event != BTN_EVT_NONE) {
     if (event == BTN_EVT_1_SHORT) {
+      int oldPage = (int)currentPage;
       currentPage = (Page)(((int)currentPage + 1) % NUM_PAGES);
+      Serial.print("[BTN] Changement page ");
+      Serial.print(oldPage);
+      Serial.print(" -> ");
+      Serial.println((int)currentPage);
     } else if (event == BTN_EVT_2_SHORT) {
+      int oldPage = (int)currentPage;
       currentPage = (Page)(((int)currentPage - 1 + NUM_PAGES) % NUM_PAGES);
+      Serial.print("[BTN] Changement page ");
+      Serial.print(oldPage);
+      Serial.print(" -> ");
+      Serial.println((int)currentPage);
     }
     needsRender = true;
   }
