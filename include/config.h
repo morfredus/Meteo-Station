@@ -1,7 +1,7 @@
 #pragma once
 
-// v1.0.19-dev - Réécriture gestion boutons (machine à états robuste, debouncing amélioré)
-#define DIAGNOSTIC_VERSION "1.0.19-dev"
+// v1.0.20-dev - Ajout logs debug détaillés (API météo, clé, HTTP, JSON, affichage)
+#define DIAGNOSTIC_VERSION "1.0.20-dev"
 
 // Vérification de la présence du fichier secrets.h
 #ifndef __has_include

@@ -15,7 +15,7 @@ String weatherCodeToIcon(int code) {
     return "clouds"; // par défaut
 }
 
-// --- [FIX] Ajout de logs détaillés pour le débogage ---
+// --- [DEBUG] Ajout de logs détaillés pour le débogage ---
 bool fetchWeatherOpenWeather(float lat, float lon, WeatherData &out) {
     Serial.println("\n=== [METEO] Debut recuperation donnees OpenWeather ===");
 
@@ -24,19 +24,35 @@ bool fetchWeatherOpenWeather(float lat, float lon, WeatherData &out) {
         return false;
     }
     Serial.println("[METEO] WiFi connecte - OK");
+    Serial.print("[METEO] IP locale: ");
+    Serial.println(WiFi.localIP());
+
+    // --- [DEBUG] Vérifier la clé API ---
+    String apiKey = String(TOKEN_OPENWEATHER);
+    Serial.print("[METEO] Cle API (longueur): ");
+    Serial.print(apiKey.length());
+    Serial.println(" caracteres");
+    if (apiKey.length() < 10 || apiKey.startsWith("YOUR_")) {
+        Serial.println("[METEO] ERREUR: Cle API non configuree !");
+        Serial.println("[METEO] Editez include/secrets.h avec votre vraie cle OpenWeather");
+        return false;
+    }
+    Serial.print("[METEO] Cle API (debut): ");
+    Serial.println(apiKey.substring(0, min(8, (int)apiKey.length())) + "...");
 
     Serial.print("[METEO] Connexion a api.openweathermap.org:443...");
     WiFiClientSecure client;
     client.setInsecure(); // pas de vérification du certificat
     if (!client.connect("api.openweathermap.org", 443)) {
         Serial.println(" ECHEC");
+        Serial.println("[METEO] Impossible de se connecter au serveur OpenWeather");
         return false;
     }
     Serial.println(" OK");
 
     String url = "/data/2.5/onecall?lat=" + String(lat, 6) +
                  "&lon=" + String(lon, 6) +
-                 "&units=metric&lang=fr&appid=" + String(TOKEN_OPENWEATHER);
+                 "&units=metric&lang=fr&appid=" + apiKey;
 
     Serial.print("[METEO] URL: ");
     Serial.println(url);
@@ -52,13 +68,20 @@ bool fetchWeatherOpenWeather(float lat, float lon, WeatherData &out) {
     int httpCode = 0;
     bool headersRead = false;
 
-    // Lire le code de statut HTTP
+    // --- [DEBUG] Lire le code de statut HTTP et tous les headers ---
     while (client.connected() || client.available()) {
         String line = client.readStringUntil('\n');
         if (line.startsWith("HTTP/1.1")) {
             httpCode = line.substring(9, 12).toInt();
             Serial.print("[METEO] Code HTTP: ");
-            Serial.println(httpCode);
+            Serial.print(httpCode);
+            Serial.print(" - ");
+            Serial.println(line);
+        }
+        // Afficher les headers importants pour debug
+        if (line.startsWith("Content-Type:") || line.startsWith("Content-Length:")) {
+            Serial.print("[METEO] Header: ");
+            Serial.println(line);
         }
         if (line == "\r") {
             headersRead = true;
@@ -68,6 +91,29 @@ bool fetchWeatherOpenWeather(float lat, float lon, WeatherData &out) {
 
     if (!headersRead) {
         Serial.println("[METEO] ERREUR: Headers HTTP non recus");
+        return false;
+    }
+
+    // --- [DEBUG] Vérifier le code HTTP ---
+    if (httpCode == 401) {
+        Serial.println("[METEO] ERREUR 401: Cle API invalide ou expiree");
+        Serial.println("[METEO] Verifiez TOKEN_OPENWEATHER dans secrets.h");
+        return false;
+    }
+    if (httpCode == 403) {
+        Serial.println("[METEO] ERREUR 403: Acces refuse");
+        Serial.println("[METEO] L'API One Call 3.0 est payante depuis juin 2024");
+        Serial.println("[METEO] Verifiez votre abonnement OpenWeather");
+        return false;
+    }
+    if (httpCode == 404) {
+        Serial.println("[METEO] ERREUR 404: Endpoint non trouve");
+        Serial.println("[METEO] Verifiez l'URL de l'API");
+        return false;
+    }
+    if (httpCode != 200) {
+        Serial.print("[METEO] ERREUR: Code HTTP inattendu: ");
+        Serial.println(httpCode);
         return false;
     }
 
@@ -84,12 +130,31 @@ bool fetchWeatherOpenWeather(float lat, float lon, WeatherData &out) {
     Serial.print("[METEO] Payload recu (");
     Serial.print(payload.length());
     Serial.println(" octets)");
-    Serial.print("[METEO] Premiers 300 caracteres: ");
-    Serial.println(payload.substring(0, min(300, (int)payload.length())));
 
-    // Vérifier si c'est une erreur JSON
+    // --- [DEBUG] Afficher les premiers caractères pour debug ---
+    Serial.print("[METEO] Premiers 500 caracteres: ");
+    Serial.println(payload.substring(0, min(500, (int)payload.length())));
+
+    // --- [DEBUG] Vérifier si c'est une erreur JSON de l'API ---
     if (payload.indexOf("\"cod\":") >= 0 && payload.indexOf("\"message\":") >= 0) {
-        Serial.println("[METEO] ATTENTION: Reponse contient un message d'erreur API");
+        Serial.println("[METEO] *** ATTENTION: Reponse contient un message d'erreur API ***");
+
+        // Extraire le code et le message d'erreur
+        int codPos = payload.indexOf("\"cod\":");
+        int msgPos = payload.indexOf("\"message\":");
+        if (codPos >= 0 && msgPos >= 0) {
+            String errorSnippet = payload.substring(codPos, min(msgPos + 100, (int)payload.length()));
+            Serial.print("[METEO] Erreur API: ");
+            Serial.println(errorSnippet);
+        }
+
+        // Cas courants d'erreurs
+        if (payload.indexOf("401") >= 0 || payload.indexOf("Invalid API key") >= 0) {
+            Serial.println("[METEO] >>> Cle API invalide ou expiree <<<");
+        }
+        if (payload.indexOf("subscription") >= 0 || payload.indexOf("upgrade") >= 0) {
+            Serial.println("[METEO] >>> Abonnement requis pour cette API <<<");
+        }
     }
 
     // --- [FIX] ArduinoJson 7 : utilisation de JsonDocument au lieu de DynamicJsonDocument ---

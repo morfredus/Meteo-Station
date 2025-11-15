@@ -1,6 +1,7 @@
 // ===============================================
 // Station Météo ESP32-S3
-// Version: 1.0.19-dev
+// Version: 1.0.20-dev
+// v1.0.20-dev - Ajout logs debug détaillés (API météo, clé, HTTP, JSON, affichage)
 // v1.0.19-dev - Réécriture gestion boutons (machine à états robuste, debouncing amélioré)
 // v1.0.18-dev - Fix logique boutons (HIGH->LOW avec pull-up), diagnostic au boot
 // v1.0.17-dev - Correction logique boutons (pull-down), ajout logs debug meteo/capteurs
@@ -228,7 +229,7 @@ static uint8_t wifiBars() {
   return 0;
 }
 
-// --- [FIX] Barre d'état corrigée (WiFi, températures, icône météo) ---
+// --- [DEBUG] Barre d'état avec logs de debug ---
 static void drawStatusBar() {
   tft.fillRect(0,0,TFT_WIDTH,20,0x0000);
 
@@ -240,6 +241,21 @@ static void drawStatusBar() {
   String tPrev = isnan(gWeather.now.tempNow) ? "--.-" : String(gWeather.now.tempNow,1);
   String tInt  = isnan(gTempInt) ? "--.-" : String(gTempInt,1);
   String line = "Ext " + tPrev + "C Int " + tInt + "C";
+
+  // --- [DEBUG] Log barre de statut (seulement si les valeurs ont changé) ---
+  static float lastTempExt = NAN;
+  static float lastTempInt = NAN;
+  if (gWeather.now.tempNow != lastTempExt || gTempInt != lastTempInt) {
+    Serial.print("[AFFICHAGE] Barre statut - Ext: ");
+    Serial.print(tPrev);
+    Serial.print("C, Int: ");
+    Serial.print(tInt);
+    Serial.print("C, Code meteo: ");
+    Serial.println(gWeather.now.conditionCode);
+    lastTempExt = gWeather.now.tempNow;
+    lastTempInt = gTempInt;
+  }
+
   tft.setCursor(32,4);
   tft.setTextColor(0xFFFF);
   tft.setTextSize(1);
@@ -303,6 +319,20 @@ static void updateBootProgress(const String &message, bool success = false) {
 static void drawPageHome() {
   tft.fillRect(0, 20, TFT_WIDTH, TFT_HEIGHT-20, 0x0000);
 
+  // --- [DEBUG] Log des données météo affichées ---
+  Serial.println("\n[AFFICHAGE] Page HOME - Donnees meteo:");
+  Serial.print("[AFFICHAGE] Temp actuelle: ");
+  Serial.print(isnan(gWeather.now.tempNow) ? "NAN" : String(gWeather.now.tempNow, 1));
+  Serial.println(" C");
+  Serial.print("[AFFICHAGE] Code condition: ");
+  Serial.println(gWeather.now.conditionCode);
+  Serial.print("[AFFICHAGE] Humidite: ");
+  Serial.print(isnan(gWeather.now.humidity) ? "NAN" : String(gWeather.now.humidity, 0));
+  Serial.println(" %");
+  Serial.print("[AFFICHAGE] Vent: ");
+  Serial.print(isnan(gWeather.now.wind) ? "NAN" : String(gWeather.now.wind, 1));
+  Serial.println(" m/s");
+
   // Titre
   tft.setTextColor(0x07FF);
   tft.setTextSize(2);
@@ -318,6 +348,7 @@ static void drawPageHome() {
     tft.println(" C");
   } else {
     tft.println("--.-C");
+    Serial.println("[AFFICHAGE] ATTENTION: Temperature NAN affichee");
   }
 
   // Min/Max
