@@ -1,7 +1,7 @@
 #pragma once
 
-// v1.0.17-dev - Correction logique boutons (pull-down), ajout logs debug meteo/capteurs
-#define DIAGNOSTIC_VERSION "1.0.17-dev"
+// v1.0.18-dev - Fix logique boutons (HIGH->LOW avec pull-up), diagnostic au boot
+#define DIAGNOSTIC_VERSION "1.0.18-dev"
 
 // Vérification de la présence du fichier secrets.h
 #ifndef __has_include
