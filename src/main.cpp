@@ -550,7 +550,7 @@ void setup() {
   updateBootProgress("Init I2C/BME280...");
   Wire.begin(I2C_SDA, I2C_SCL);
 
-  if (!bme.begin(0x76)) { // Adresse I2C par défaut du BME280 : 0x76 ou 0x77
+  if (!bme.begin(I2C_ADDRESS_BME280)) { 
     Serial.println("ERREUR: BME280 non detecte!");
     updateBootProgress("BME280 echec", false);
   } else {
