@@ -1,6 +1,7 @@
 // ===============================================
 // Station Météo ESP32-S3
-// Version: 1.0.18-dev
+// Version: 1.0.19-dev
+// v1.0.19-dev - Réécriture gestion boutons (machine à états robuste, debouncing amélioré)
 // v1.0.18-dev - Fix logique boutons (HIGH->LOW avec pull-up), diagnostic au boot
 // v1.0.17-dev - Correction logique boutons (pull-down), ajout logs debug meteo/capteurs
 // v1.0.16-dev - Remplacement DHT22 par BME280, nettoyage buttons.h
@@ -65,7 +66,7 @@ Page currentPage = PAGE_HOME;
 unsigned long lastSensorMs=0, lastWeatherMs=0, lastGpsTryMs=0, lastNtpMs=0;
 
 // ====================================================================================
-// --- [REWRITE] Gestion des boutons réécrite pour plus de simplicité et de fiabilité ---
+// --- [REWRITE] Gestion des boutons avec machine à états robuste et debouncing ---
 // ====================================================================================
 enum ButtonEvent {
   BTN_EVT_NONE,
@@ -73,38 +74,129 @@ enum ButtonEvent {
   BTN_EVT_2_SHORT
 };
 
-const unsigned long DEBOUNCE_DELAY = 50;
+// Machine à états pour chaque bouton
+enum ButtonState {
+  BTN_STATE_IDLE,       // Bouton relâché (HIGH)
+  BTN_STATE_DEBOUNCE,   // En cours de debouncing
+  BTN_STATE_PRESSED,    // Bouton pressé confirmé (LOW stable)
+  BTN_STATE_WAIT_RELEASE // Attente du relâchement
+};
 
-// --- [FIX] Détection front descendant (pull-up externe pour GPIO34, interne pour GPIO27) ---
+const unsigned long DEBOUNCE_DELAY = 50;        // Temps de stabilisation du signal
+const unsigned long MIN_PRESS_TIME = 20;        // Temps minimum de pression pour valider
+const unsigned long REPEAT_DELAY = 500;         // Délai avant répétition automatique
+
+// --- [REWRITE] Gestion robuste avec vérification de stabilité du signal ---
 ButtonEvent getButtonEvent() {
-  static unsigned long lastBtn1Press = 0;
-  static unsigned long lastBtn2Press = 0;
-  static int lastBtn1State = HIGH;  // État initial HIGH (pull-up)
-  static int lastBtn2State = HIGH;  // État initial HIGH (pull-up)
-
-  // Lecture de l'état actuel des boutons
-  int btn1State = digitalRead(PIN_BTN1);
-  int btn2State = digitalRead(PIN_BTN2);
+  static ButtonState btn1_state = BTN_STATE_IDLE;
+  static ButtonState btn2_state = BTN_STATE_IDLE;
+  static unsigned long btn1_timestamp = 0;
+  static unsigned long btn2_timestamp = 0;
+  static bool btn1_event_sent = false;
+  static bool btn2_event_sent = false;
 
   ButtonEvent event = BTN_EVT_NONE;
+  unsigned long now = millis();
 
-  // --- [FIX] Détection du front descendant (HIGH -> LOW) pour boutons avec pull-up ---
-  // Gestion du bouton 1 - Page suivante
-  if (btn1State == LOW && lastBtn1State == HIGH && (millis() - lastBtn1Press > DEBOUNCE_DELAY)) {
-    lastBtn1Press = millis();
-    event = BTN_EVT_1_SHORT;
-    Serial.println("[BTN] Bouton 1 presse - Page suivante");
-  }
-  // Gestion du bouton 2 - Page précédente
-  if (btn2State == LOW && lastBtn2State == HIGH && (millis() - lastBtn2Press > DEBOUNCE_DELAY)) {
-    lastBtn2Press = millis();
-    event = BTN_EVT_2_SHORT;
-    Serial.println("[BTN] Bouton 2 presse - Page precedente");
+  // ============== Gestion du Bouton 1 ==============
+  int btn1_reading = digitalRead(PIN_BTN1);
+
+  switch (btn1_state) {
+    case BTN_STATE_IDLE:
+      // Bouton relâché, attente d'une pression
+      if (btn1_reading == LOW) {
+        // Début possible d'une pression, démarrer le debouncing
+        btn1_state = BTN_STATE_DEBOUNCE;
+        btn1_timestamp = now;
+      }
+      break;
+
+    case BTN_STATE_DEBOUNCE:
+      // Vérification de la stabilité du signal
+      if (btn1_reading == HIGH) {
+        // Faux positif (rebondissement), retour à l'état idle
+        btn1_state = BTN_STATE_IDLE;
+      } else if ((now - btn1_timestamp) >= DEBOUNCE_DELAY) {
+        // Signal stable LOW pendant DEBOUNCE_DELAY, pression confirmée
+        btn1_state = BTN_STATE_PRESSED;
+        btn1_timestamp = now;
+        btn1_event_sent = false;
+      }
+      break;
+
+    case BTN_STATE_PRESSED:
+      // Bouton pressé confirmé
+      if (btn1_reading == HIGH) {
+        // Bouton relâché prématurément
+        btn1_state = BTN_STATE_IDLE;
+        btn1_event_sent = false;
+      } else if (!btn1_event_sent && (now - btn1_timestamp) >= MIN_PRESS_TIME) {
+        // Pression valide et suffisamment longue
+        event = BTN_EVT_1_SHORT;
+        btn1_event_sent = true;
+        btn1_state = BTN_STATE_WAIT_RELEASE;
+        Serial.println("[BTN] Bouton 1 presse - Page suivante");
+      }
+      break;
+
+    case BTN_STATE_WAIT_RELEASE:
+      // Attente du relâchement du bouton
+      if (btn1_reading == HIGH) {
+        btn1_state = BTN_STATE_IDLE;
+        btn1_event_sent = false;
+      }
+      break;
   }
 
-  // Mettre à jour l'état des boutons à chaque cycle pour une détection fiable
-  lastBtn1State = btn1State;
-  lastBtn2State = btn2State;
+  // ============== Gestion du Bouton 2 ==============
+  int btn2_reading = digitalRead(PIN_BTN2);
+
+  switch (btn2_state) {
+    case BTN_STATE_IDLE:
+      // Bouton relâché, attente d'une pression
+      if (btn2_reading == LOW) {
+        // Début possible d'une pression, démarrer le debouncing
+        btn2_state = BTN_STATE_DEBOUNCE;
+        btn2_timestamp = now;
+      }
+      break;
+
+    case BTN_STATE_DEBOUNCE:
+      // Vérification de la stabilité du signal
+      if (btn2_reading == HIGH) {
+        // Faux positif (rebondissement), retour à l'état idle
+        btn2_state = BTN_STATE_IDLE;
+      } else if ((now - btn2_timestamp) >= DEBOUNCE_DELAY) {
+        // Signal stable LOW pendant DEBOUNCE_DELAY, pression confirmée
+        btn2_state = BTN_STATE_PRESSED;
+        btn2_timestamp = now;
+        btn2_event_sent = false;
+      }
+      break;
+
+    case BTN_STATE_PRESSED:
+      // Bouton pressé confirmé
+      if (btn2_reading == HIGH) {
+        // Bouton relâché prématurément
+        btn2_state = BTN_STATE_IDLE;
+        btn2_event_sent = false;
+      } else if (!btn2_event_sent && (now - btn2_timestamp) >= MIN_PRESS_TIME) {
+        // Pression valide et suffisamment longue
+        event = BTN_EVT_2_SHORT;
+        btn2_event_sent = true;
+        btn2_state = BTN_STATE_WAIT_RELEASE;
+        Serial.println("[BTN] Bouton 2 presse - Page precedente");
+      }
+      break;
+
+    case BTN_STATE_WAIT_RELEASE:
+      // Attente du relâchement du bouton
+      if (btn2_reading == HIGH) {
+        btn2_state = BTN_STATE_IDLE;
+        btn2_event_sent = false;
+      }
+      break;
+  }
 
   return event;
 }
