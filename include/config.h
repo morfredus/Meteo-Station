@@ -1,7 +1,7 @@
 #pragma once
 
-// v1.0.16-dev - Remplacement DHT22 par BME280, nettoyage buttons.h
-#define DIAGNOSTIC_VERSION "1.0.16-dev"
+// v1.0.17-dev - Correction logique boutons (pull-down), ajout logs debug meteo/capteurs
+#define DIAGNOSTIC_VERSION "1.0.17-dev"
 
 // Vérification de la présence du fichier secrets.h
 #ifndef __has_include
