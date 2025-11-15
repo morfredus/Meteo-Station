@@ -1,8 +1,8 @@
 // ===============================================
 // Station Météo ESP32-S3
-// Version: 1.0.09
-// v1.0.09 - Correction erreurs de compilation (scope Buttons::)
-// v1.0.08 - Correction erreurs de compilation (scope Buttons)
+// Version: 1.0.15
+// v1.0.15 - Correction du conflit de broches des boutons avec les LEDs RGB
+// v1.0.11 - Réécriture de la gestion des boutons (in-file)
 // v1.0.07 - Correction navigation pages, gestion rafraîchissement écran
 // v1.0.01-dev - Correction compilation ESP32-S3 : AsyncTCP et ArduinoJson 7
 // v1.0.02-dev - Désactivation ESPAsyncWebServer (non utilisé, conflit WiFiServer.h)
@@ -25,7 +25,6 @@
 #include "weather.h"
 #include "gps.h"
 #include "telemetry.h"
-#include "buttons.h"
 
 WiFiMulti wifiMulti;
 
@@ -58,6 +57,47 @@ const int NUM_PAGES = 5;
 Page currentPage = PAGE_HOME;
 
 unsigned long lastSensorMs=0, lastWeatherMs=0, lastGpsTryMs=0, lastNtpMs=0;
+
+// ====================================================================================
+// --- [REWRITE] Gestion des boutons réécrite pour plus de simplicité et de fiabilité ---
+// ====================================================================================
+enum ButtonEvent {
+  BTN_EVT_NONE,
+  BTN_EVT_1_SHORT,
+  BTN_EVT_2_SHORT
+};
+
+const unsigned long DEBOUNCE_DELAY = 50;
+
+ButtonEvent getButtonEvent() {
+  static unsigned long lastBtn1Press = 0;
+  static unsigned long lastBtn2Press = 0;
+  static int lastBtn1State = HIGH;
+  static int lastBtn2State = HIGH;
+
+  // Lecture de l'état actuel des boutons
+  int btn1State = digitalRead(PIN_BTN1);
+  int btn2State = digitalRead(PIN_BTN2);
+
+  ButtonEvent event = BTN_EVT_NONE;
+
+  // Gestion du bouton 1
+  if (btn1State == LOW && lastBtn1State == HIGH && (millis() - lastBtn1Press > DEBOUNCE_DELAY)) {
+    lastBtn1Press = millis();
+    event = BTN_EVT_1_SHORT;
+  }
+  // Gestion du bouton 2
+  if (btn2State == LOW && lastBtn2State == HIGH && (millis() - lastBtn2Press > DEBOUNCE_DELAY)) {
+    lastBtn2Press = millis();
+    event = BTN_EVT_2_SHORT;
+  }
+
+  // Mettre à jour l'état des boutons à chaque cycle pour une détection fiable
+  lastBtn1State = btn1State;
+  lastBtn2State = btn2State;
+
+  return event;
+}
 
 // Buzzer
 static void beepConnected() {
@@ -130,12 +170,12 @@ static void showBootScreen() {
   // Ligne de séparation
   tft.drawFastHLine(40, 150, TFT_WIDTH-80, 0x07FF);
 
-  delay(1000);
+  // delay(1000); // [FIX] Remplacé par une gestion non-bloquante
 }
 
-static void updateBootProgress(const String &message, bool success = false) {
-  static int yPos = 170;
+int yPos = 170; // [FIX] Variable pour la position verticale des messages de démarrage
 
+static void updateBootProgress(const String &message, bool success = false) {
   if (yPos > TFT_HEIGHT - 20) {
     // Effacer la zone de progression si on déborde
     tft.fillRect(0, 165, TFT_WIDTH, TFT_HEIGHT-165, 0x0000);
@@ -450,6 +490,8 @@ void renderPage() {
   }
 }
 
+unsigned long bootPauseUntil = 0;
+
 void setup() {
   Serial.begin(115200);
 
@@ -464,6 +506,10 @@ void setup() {
   ledcSetup(LEDC_BUZ_CH, LEDC_BUZ_FREQ, LEDC_BUZ_RES);
   ledcAttachPin(PIN_BUZZER, LEDC_BUZ_CH);
 
+  // --- [FIX] Configuration des pins des boutons ---
+  pinMode(PIN_BTN1, INPUT_PULLUP);
+  pinMode(PIN_BTN2, INPUT_PULLUP);
+
   // Initialisation SPI avec les pins personnalisés pour le TFT
   SPI.begin(PIN_TFT_SCL, -1, PIN_TFT_SDA, PIN_TFT_CS);
 
@@ -472,12 +518,13 @@ void setup() {
 
   // Afficher l'écran d'accueil
   showBootScreen();
+  bootPauseUntil = millis() + 1000; // Pause non-bloquante
+  while (millis() < bootPauseUntil) { /* attendre */ }
 
   updateBootProgress("Init I2C/DHT...");
   Wire.begin(I2C_SDA, I2C_SCL);
   dht.begin();
-  delay(300);
-  updateBootProgress("Init I2C/DHT...", true);
+  updateBootProgress("Init I2C/DHT", true);
 
   updateBootProgress("Connexion WiFi...");
   wifiMulti.addAP(WIFI_SSID1, WIFI_PASS1);
@@ -498,22 +545,21 @@ void setup() {
 
   updateBootProgress("Config NTP...");
   configTzTime(TZ_STRING, NTP_SERVER);
-  delay(300);
-  updateBootProgress("Config NTP...", true);
+  updateBootProgress("Config NTP", true);
 
   updateBootProgress("Init GPS...");
   gpsBegin();
-  delay(300);
-  updateBootProgress("Init GPS...", true);
+  updateBootProgress("Init GPS", true);
 
   if (WiFi.status()==WL_CONNECTED) {
     updateBootProgress("Envoi telegram...");
     telegramSend("Demarrage station.\n" + formatWeatherBrief());
-    delay(300);
-    updateBootProgress("Envoi telegram...", true);
+    updateBootProgress("Envoi telegram", true);
   }
 
-  delay(1500); // Pause pour lire l'écran de démarrage
+  bootPauseUntil = millis() + 1500; // Pause non-bloquante pour lire l'écran
+  while (millis() < bootPauseUntil) { /* attendre */ }
+
   renderPage();
   updateBacklightAndRgbByLuminosity(); // Allumer l'écran et la LED immédiatement
 }
@@ -523,11 +569,11 @@ void loop() {
   bool needsRender = false;
 
   // 1. Gérer les pressions de boutons
-  Buttons::ButtonEvent event = Buttons::getEvent();
-  if (event != Buttons::BTN_EVT_NONE) {
-    if (event == Buttons::BTN_EVT_1_SHORT) {
+  ButtonEvent event = getButtonEvent();
+  if (event != BTN_EVT_NONE) {
+    if (event == BTN_EVT_1_SHORT) {
       currentPage = (Page)(((int)currentPage + 1) % NUM_PAGES);
-    } else if (event == Buttons::BTN_EVT_2_SHORT) {
+    } else if (event == BTN_EVT_2_SHORT) {
       currentPage = (Page)(((int)currentPage - 1 + NUM_PAGES) % NUM_PAGES);
     }
     needsRender = true;
@@ -583,5 +629,5 @@ void loop() {
   // Telegram commandes
   telegramLoop();
 
-  delay(10);
+  // delay(10); // [FIX] Supprimé pour une réactivité maximale
 }

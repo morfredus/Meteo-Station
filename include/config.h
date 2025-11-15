@@ -15,32 +15,32 @@
 #endif
 
 // definition des pin
-// --- [NEW FEATURE] Ajout des pins SPI pour l'écran TFT ST7789 ---
-#define PIN_TFT_CS 5
-#define PIN_TFT_DC 19
-#define PIN_TFT_RST 4
-#define PIN_TFT_BL 15
-#define PIN_TFT_SCL 18  // SPI SCK (Clock)
-#define PIN_TFT_SDA 23  // SPI MOSI (Data)
-#define TFT_ROTATION 2
-
-#define PIN_DHT 27
-
-#define PIN_LED_R 14
-#define PIN_LED_G 13
-#define PIN_LED_B 12
-
-#define PIN_BTN1 34
-#define PIN_BTN2 35
-
-#define PIN_BUZZER 25
-
-#define PIN_GPS_RX 16
-#define PIN_GPS_TX 17
-#define PIN_GPS_PPS 26
-
-#define I2C_SDA 21
-#define I2C_SCL 22
+// Écran TFT ST7789 (Mode 4 fils SPI)
+#define PIN_TFT_CS 5     // GPIO 5 : Chip Select (CS) - SPI
+#define PIN_TFT_DC 19    // GPIO 19 : Data/Command (DC)
+#define PIN_TFT_RST 4    // GPIO 4 : Reset
+#define PIN_TFT_BL 15    // GPIO 15 (MTDO) : Backlight (Rétroéclairage) - (Doit être HIGH au boot)
+#define PIN_TFT_SCL 18   // GPIO 18 : SPI Clock (SCK)
+#define PIN_TFT_SDA 23   // GPIO 23 : SPI Data (MOSI)
+#define TFT_ROTATION 2   // Rotation de l'écran (0-3)
+// LED RGB (Masse Commune)
+#define PIN_LED_R 14     // GPIO 14 : Output pour le Rouge
+#define PIN_LED_G 13     // GPIO 13 : Output pour le Vert
+#define PIN_LED_B 2      // GPIO 2 : Output pour le Bleu - (Sélectionné pour le "safe boot")
+// Capteur de Luminosité (ADC)
+#define PIN_LIGHT_SENSOR 35
+// Deux boutons
+#define PIN_BTN1 34      // GPIO 34 : Input Only - (Sélectionné pour le "safe boot" à la place de GPIO 0)
+#define PIN_BTN2 27      // GPIO 27 : Input
+// Buzzer
+#define PIN_BUZZER 25    // GPIO 25 : Output pour le Buzzer
+// Moduel GPS GT-U7 (UART 2)
+#define PIN_GPS_RX 16    // GPIO 16 (RX2) : Réception (vers GPS TX)
+#define PIN_GPS_TX 17    // GPIO 17 (TX2) : Transmission (vers GPS RX)
+#define PIN_GPS_PPS 26   // GPIO 26 : Pulse Per Second
+// Capteur GY-BME280 / OLED (I2C)
+#define I2C_SDA 21       // GPIO 21 : I2C Data (SDA) - Utilisé par BME280
+#define I2C_SCL 22       // GPIO 22 : I2C Clock (SCL) - Utilisé par BME280
 
 #define LEDC_BL_CH 0
 #define LEDC_BL_FREQ 5000
