@@ -1,6 +1,7 @@
 // ===============================================
 // Station Météo ESP32-S3
-// Version: 1.0.16-dev
+// Version: 1.0.17-dev
+// v1.0.17-dev - Correction logique boutons (pull-down), ajout logs debug meteo/capteurs
 // v1.0.16-dev - Remplacement DHT22 par BME280, nettoyage buttons.h
 // v1.0.15 - Correction du conflit de broches des boutons avec les LEDs RGB
 // v1.0.11 - Réécriture de la gestion des boutons (in-file)
@@ -73,11 +74,12 @@ enum ButtonEvent {
 
 const unsigned long DEBOUNCE_DELAY = 50;
 
+// --- [FIX] Logique inversée pour boutons avec pull-down (GPIO 34 n'a pas de pull-up interne) ---
 ButtonEvent getButtonEvent() {
   static unsigned long lastBtn1Press = 0;
   static unsigned long lastBtn2Press = 0;
-  static int lastBtn1State = HIGH;
-  static int lastBtn2State = HIGH;
+  static int lastBtn1State = LOW;  // État initial LOW (pull-down)
+  static int lastBtn2State = LOW;  // État initial LOW (pull-down)
 
   // Lecture de l'état actuel des boutons
   int btn1State = digitalRead(PIN_BTN1);
@@ -85,15 +87,18 @@ ButtonEvent getButtonEvent() {
 
   ButtonEvent event = BTN_EVT_NONE;
 
+  // --- [FIX] Détection du front montant (LOW -> HIGH) pour boutons avec pull-down ---
   // Gestion du bouton 1
-  if (btn1State == LOW && lastBtn1State == HIGH && (millis() - lastBtn1Press > DEBOUNCE_DELAY)) {
+  if (btn1State == HIGH && lastBtn1State == LOW && (millis() - lastBtn1Press > DEBOUNCE_DELAY)) {
     lastBtn1Press = millis();
     event = BTN_EVT_1_SHORT;
+    Serial.println("[BTN] Bouton 1 presse");
   }
   // Gestion du bouton 2
-  if (btn2State == LOW && lastBtn2State == HIGH && (millis() - lastBtn2Press > DEBOUNCE_DELAY)) {
+  if (btn2State == HIGH && lastBtn2State == LOW && (millis() - lastBtn2Press > DEBOUNCE_DELAY)) {
     lastBtn2Press = millis();
     event = BTN_EVT_2_SHORT;
+    Serial.println("[BTN] Bouton 2 presse");
   }
 
   // Mettre à jour l'état des boutons à chaque cycle pour une détection fiable
@@ -511,8 +516,9 @@ void setup() {
   ledcAttachPin(PIN_BUZZER, LEDC_BUZ_CH);
 
   // --- [FIX] Configuration des pins des boutons ---
-  pinMode(PIN_BTN1, INPUT_PULLUP);
-  pinMode(PIN_BTN2, INPUT_PULLUP);
+  // GPIO 34 est INPUT-ONLY sans pull-up interne, on suppose pull-down externe
+  pinMode(PIN_BTN1, INPUT);
+  pinMode(PIN_BTN2, INPUT);
 
   // Initialisation SPI avec les pins personnalisés pour le TFT
   SPI.begin(PIN_TFT_SCL, -1, PIN_TFT_SDA, PIN_TFT_CS);
@@ -562,7 +568,18 @@ void setup() {
   gpsBegin();
   updateBootProgress("Init GPS", true);
 
+  // --- [FIX] Récupération météo initiale au démarrage ---
   if (WiFi.status()==WL_CONNECTED) {
+    updateBootProgress("Recuperation meteo...");
+    Serial.println("\n[SETUP] Premiere recuperation meteo...");
+    if (fetchWeatherOpenWeather(gLat, gLon, gWeather)) {
+      updateBootProgress("Meteo OK", true);
+      Serial.println("[SETUP] Meteo initiale recuperee");
+    } else {
+      updateBootProgress("Meteo echec", false);
+      Serial.println("[SETUP] Echec meteo initiale");
+    }
+
     updateBootProgress("Envoi telegram...");
     telegramSend("Demarrage station.\n" + formatWeatherBrief());
     updateBootProgress("Envoi telegram", true);
@@ -573,6 +590,9 @@ void setup() {
 
   renderPage();
   updateBacklightAndRgbByLuminosity(); // Allumer l'écran et la LED immédiatement
+
+  Serial.println("\n[SETUP] === Initialisation terminee ===");
+  Serial.println("[SETUP] Station meteo prete\n");
 }
 
 void loop() {
@@ -603,8 +623,20 @@ void loop() {
   // --- [FIX] Capteurs intérieurs (BME280) ---
   if (millis() - lastSensorMs > REFRESH_SENSOR_MS) {
     lastSensorMs = millis();
+    Serial.println("\n[CAPTEUR] Lecture BME280...");
     gTempInt = bme.readTemperature();
     gHumInt = bme.readHumidity();
+
+    Serial.print("[CAPTEUR] Temperature: ");
+    Serial.print(gTempInt);
+    Serial.println(" C");
+    Serial.print("[CAPTEUR] Humidite: ");
+    Serial.print(gHumInt);
+    Serial.println(" %");
+
+    if (isnan(gTempInt) || isnan(gHumInt)) {
+      Serial.println("[CAPTEUR] ATTENTION: Valeurs NaN - capteur non detecte ou erreur");
+    }
 
     if (WiFi.status()==WL_CONNECTED) {
       if (!isnan(gTempInt) && gTempInt >= TEMP_HIGH_ALERT)
@@ -618,11 +650,20 @@ void loop() {
   // Météo
   if (millis() - lastWeatherMs > REFRESH_WEATHER_MS) {
     lastWeatherMs = millis();
+    Serial.print("\n[LOOP] Appel fetchWeatherOpenWeather (lat=");
+    Serial.print(gLat, 5);
+    Serial.print(", lon=");
+    Serial.print(gLon, 5);
+    Serial.println(")");
+
     if (fetchWeatherOpenWeather(gLat, gLon, gWeather)) {
+      Serial.println("[LOOP] Meteo recuperee avec succes");
       if (gWeather.now.hasAlert) {
         telegramSend("Alerte meteo: " + String(gWeather.now.alertTitle) + "\n" + String(gWeather.now.alertDesc));
       }
       needsRender = true;
+    } else {
+      Serial.println("[LOOP] ECHEC de la recuperation meteo");
     }
   }
 
