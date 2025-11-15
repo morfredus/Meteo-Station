@@ -1,6 +1,7 @@
 // ===============================================
 // Station Météo ESP32-S3
-// Version: 1.0.15
+// Version: 1.0.16-dev
+// v1.0.16-dev - Remplacement DHT22 par BME280, nettoyage buttons.h
 // v1.0.15 - Correction du conflit de broches des boutons avec les LEDs RGB
 // v1.0.11 - Réécriture de la gestion des boutons (in-file)
 // v1.0.07 - Correction navigation pages, gestion rafraîchissement écran
@@ -18,7 +19,9 @@
 #include <Adafruit_ST7789.h>
 #include <SPI.h>
 #include <Wire.h>
-#include "DHT.h"
+// --- [FIX] Remplacement DHT22 par BME280 ---
+#include <Adafruit_Sensor.h>
+#include <Adafruit_BME280.h>
 
 #include "config.h"
 #include "ui_icons.h"
@@ -30,7 +33,8 @@ WiFiMulti wifiMulti;
 
 // TFT et capteurs
 Adafruit_ST7789 tft = Adafruit_ST7789(PIN_TFT_CS, PIN_TFT_DC, PIN_TFT_RST);
-DHT dht(PIN_DHT, DHT22); // bascule vers DHT11 si besoin
+// --- [FIX] Capteur BME280 au lieu de DHT22 ---
+Adafruit_BME280 bme; // Capteur BME280 sur I2C
 
 // --- [FIX] Initialisation explicite des données météo ---
 WeatherData gWeather = {
@@ -359,11 +363,11 @@ static void drawPageSensors() {
   tft.setCursor(10, 30);
   tft.println("CAPTEURS LOCAUX");
 
-  // DHT22
+  // --- [FIX] BME280 au lieu de DHT22 ---
   tft.setTextColor(0xFFE0);
   tft.setTextSize(1);
   tft.setCursor(10, 60);
-  tft.println("DHT22 (Interieur):");
+  tft.println("BME280 (Interieur):");
 
   tft.setTextColor(0xFFFF);
   tft.setCursor(20, 75);
@@ -521,10 +525,17 @@ void setup() {
   bootPauseUntil = millis() + 1000; // Pause non-bloquante
   while (millis() < bootPauseUntil) { /* attendre */ }
 
-  updateBootProgress("Init I2C/DHT...");
+  // --- [FIX] Initialisation BME280 au lieu de DHT ---
+  updateBootProgress("Init I2C/BME280...");
   Wire.begin(I2C_SDA, I2C_SCL);
-  dht.begin();
-  updateBootProgress("Init I2C/DHT", true);
+
+  if (!bme.begin(0x76)) { // Adresse I2C par défaut du BME280 : 0x76 ou 0x77
+    Serial.println("ERREUR: BME280 non detecte!");
+    updateBootProgress("BME280 echec", false);
+  } else {
+    Serial.println("BME280 initialise avec succes");
+    updateBootProgress("Init BME280", true);
+  }
 
   updateBootProgress("Connexion WiFi...");
   wifiMulti.addAP(WIFI_SSID1, WIFI_PASS1);
@@ -589,11 +600,11 @@ void loop() {
     gUseDefaultGeo = false;
   }
 
-  // Capteurs intérieurs
+  // --- [FIX] Capteurs intérieurs (BME280) ---
   if (millis() - lastSensorMs > REFRESH_SENSOR_MS) {
     lastSensorMs = millis();
-    gTempInt = dht.readTemperature();
-    gHumInt = dht.readHumidity();
+    gTempInt = bme.readTemperature();
+    gHumInt = bme.readHumidity();
 
     if (WiFi.status()==WL_CONNECTED) {
       if (!isnan(gTempInt) && gTempInt >= TEMP_HIGH_ALERT)
