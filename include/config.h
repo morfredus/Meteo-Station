@@ -1,7 +1,7 @@
 #pragma once
 
-// v1.0.09 - Correction erreurs de compilation (scope Buttons::)
-#define DIAGNOSTIC_VERSION "1.0.09"
+// v1.0.16-dev - Remplacement DHT22 par BME280, nettoyage buttons.h
+#define DIAGNOSTIC_VERSION "1.0.16-dev"
 
 // Vérification de la présence du fichier secrets.h
 #ifndef __has_include

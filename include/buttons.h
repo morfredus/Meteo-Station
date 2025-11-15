@@ -3,6 +3,12 @@
 #include <Arduino.h>
 #include "config.h"
 
+// --- [DEPRECATED] Ce fichier n'est plus utilisé ---
+// La gestion des boutons a été déplacée dans main.cpp (fonction getButtonEvent())
+// pour éviter les problèmes de configuration et de synchronisation.
+// Le code est conservé ici pour référence future.
+
+/*
 // Déclarations anticipées (forward declarations) des variables et fonctions
 // qui sont définies dans main.cpp mais utilisées ici.
 enum Page : int;
@@ -42,3 +48,4 @@ void loop() {
 }
 
 } // namespace Buttons
+*/
